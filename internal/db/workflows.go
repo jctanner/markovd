@@ -43,6 +43,34 @@ func (d *DB) ListWorkflows(ctx context.Context) ([]models.Workflow, error) {
 	return workflows, rows.Err()
 }
 
+func (d *DB) UpdateWorkflow(ctx context.Context, name, yaml string) (*models.Workflow, error) {
+	var w models.Workflow
+	err := d.QueryRowContext(ctx,
+		`UPDATE workflows SET yaml = $2, updated_at = now() WHERE name = $1
+		 RETURNING id, name, yaml, uploaded_by, created_at, updated_at`,
+		name, yaml,
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.CreatedAt, &w.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("updating workflow: %w", err)
+	}
+	return &w, nil
+}
+
+func (d *DB) DeleteWorkflow(ctx context.Context, name string) error {
+	result, err := d.ExecContext(ctx, `DELETE FROM workflows WHERE name = $1`, name)
+	if err != nil {
+		return fmt.Errorf("deleting workflow: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (d *DB) GetWorkflowByName(ctx context.Context, name string) (*models.Workflow, error) {
 	var w models.Workflow
 	err := d.QueryRowContext(ctx,

@@ -12,6 +12,10 @@ type createWorkflowRequest struct {
 	YAML string `json:"yaml"`
 }
 
+type updateWorkflowRequest struct {
+	YAML string `json:"yaml"`
+}
+
 func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) {
 	workflows, err := s.db.ListWorkflows(r.Context())
 	if err != nil {
@@ -56,4 +60,40 @@ func (s *Server) handleCreateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, wf)
+}
+
+func (s *Server) handleUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req updateWorkflowRequest
+	if err := readJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if req.YAML == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "yaml required"})
+		return
+	}
+
+	wf, err := s.db.UpdateWorkflow(r.Context(), name, req.YAML)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update workflow"})
+		return
+	}
+	if wf == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "workflow not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, wf)
+}
+
+func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	if err := s.db.DeleteWorkflow(r.Context(), name); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "workflow not found"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

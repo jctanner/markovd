@@ -3,7 +3,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jctanner/markovd/internal/models"
@@ -13,6 +15,7 @@ import (
 type createRunRequest struct {
 	WorkflowName string            `json:"workflow_name"`
 	Vars         map[string]string `json:"vars"`
+	Debug        bool              `json:"debug"`
 }
 
 type runDetailResponse struct {
@@ -82,6 +85,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		Vars:          req.Vars,
 		CallbackURL:   s.callbackURL,
 		CallbackToken: s.callbackToken,
+		Debug:         req.Debug,
 	}
 
 	runID, err := s.runner.Start(r.Context(), runReq)
@@ -97,4 +101,64 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, run)
+}
+
+func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
+	runID := chi.URLParam(r, "runID")
+
+	run, err := s.db.GetRunByID(r.Context(), runID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get run"})
+		return
+	}
+	if run == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "run not found"})
+		return
+	}
+
+	if run.Status != "running" && run.Status != "pending" {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": fmt.Sprintf("cannot cancel run with status %q", run.Status)})
+		return
+	}
+
+	if err := s.runner.Cancel(runID); err != nil {
+		log.Printf("Warning: cancel runner for %s: %v", runID, err)
+	}
+
+	now := time.Now()
+	if err := s.db.UpdateRunStatus(r.Context(), runID, "cancelled", &now); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update run status"})
+		return
+	}
+
+	run.Status = "cancelled"
+	run.CompletedAt = &now
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
+	runID := chi.URLParam(r, "runID")
+
+	run, err := s.db.GetRunByID(r.Context(), runID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get run"})
+		return
+	}
+	if run == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "run not found"})
+		return
+	}
+
+	if run.Status == "running" || run.Status == "pending" {
+		if err := s.runner.Cancel(runID); err != nil {
+			log.Printf("Warning: cancel runner for %s before delete: %v", runID, err)
+		}
+	}
+
+	if err := s.db.DeleteRun(r.Context(), runID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete run"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

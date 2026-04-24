@@ -9,6 +9,7 @@ function badgeClass(status: string): string {
     running: 'badge-running',
     completed: 'badge-completed',
     failed: 'badge-failed',
+    cancelled: 'badge-failed',
   };
   return `badge ${map[status] || 'badge-pending'}`;
 }
@@ -31,6 +32,25 @@ export default function Runs() {
       setRuns(await api.listRuns());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load runs');
+    }
+  };
+
+  const handleCancel = async (runID: string) => {
+    try {
+      await api.cancelRun(runID);
+      await loadRuns();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel run');
+    }
+  };
+
+  const handleDelete = async (runID: string) => {
+    if (!window.confirm(`Delete run ${runID}? This cannot be undone.`)) return;
+    try {
+      await api.deleteRun(runID);
+      await loadRuns();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete run');
     }
   };
 
@@ -58,6 +78,7 @@ export default function Runs() {
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -76,11 +97,22 @@ export default function Runs() {
                 <td className="cell-mono">
                   {duration(run.started_at, run.completed_at)}
                 </td>
+                <td>
+                  {(run.status === 'running' || run.status === 'pending') && (
+                    <button className="btn btn-sm btn-danger" onClick={() => handleCancel(run.run_id)}>
+                      Stop
+                    </button>
+                  )}
+                  {' '}
+                  <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(run.run_id)}>
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
             {runs.length === 0 && (
               <tr>
-                <td colSpan={5} className="table-empty">
+                <td colSpan={6} className="table-empty">
                   No runs yet. <Link to="/trigger">Trigger one</Link>.
                 </td>
               </tr>

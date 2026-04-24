@@ -56,18 +56,28 @@ func (s *Server) handleEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// rootRunID extracts the 8-char root run ID from a compound sub-workflow ID.
-// e.g. "97639fd9-deploy_all-0-health_check" → "97639fd9"
 func rootRunID(id string) string {
+	if strings.HasPrefix(id, "markov-run-") {
+		parts := strings.SplitN(id, "-", 4)
+		if len(parts) >= 3 {
+			return strings.Join(parts[:3], "-")
+		}
+		return id
+	}
 	if len(id) >= 8 {
 		return id[:8]
 	}
 	return id
 }
 
-// forkID returns the sub-workflow context suffix, or "" for top-level steps.
-// e.g. "97639fd9-deploy_all-0" → "deploy_all-0"
 func forkID(id string) string {
+	if strings.HasPrefix(id, "markov-run-") {
+		parts := strings.SplitN(id, "-", 4)
+		if len(parts) >= 4 {
+			return parts[3]
+		}
+		return ""
+	}
 	if len(id) > 9 && id[8] == '-' {
 		return id[9:]
 	}

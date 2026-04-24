@@ -71,6 +71,26 @@ func (d *DB) UpdateRunStatus(ctx context.Context, runID, status string, complete
 	return err
 }
 
+func (d *DB) DeleteRun(ctx context.Context, runID string) error {
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, q := range []string{
+		`DELETE FROM steps WHERE run_id = $1`,
+		`DELETE FROM events WHERE run_id = $1`,
+		`DELETE FROM runs WHERE run_id = $1`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, runID); err != nil {
+			return fmt.Errorf("deleting run data: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (d *DB) UpsertRunFromEvent(ctx context.Context, runID, workflowName, status string, startedAt, completedAt *time.Time) error {
 	_, err := d.ExecContext(ctx,
 		`INSERT INTO runs (run_id, workflow_name, status, started_at, completed_at)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { RunDetail as RunDetailType } from '../api';
 import StepTable from '../components/StepTable';
@@ -12,6 +12,7 @@ function badgeClass(status: string): string {
     running: 'badge-running',
     completed: 'badge-completed',
     failed: 'badge-failed',
+    cancelled: 'badge-failed',
   };
   return `badge ${map[status] || 'badge-pending'}`;
 }
@@ -20,6 +21,7 @@ type ViewMode = 'graph' | 'gantt' | 'table';
 
 export default function RunDetail() {
   const { runID } = useParams<{ runID: string }>();
+  const navigate = useNavigate();
   const [run, setRun] = useState<RunDetailType | null>(null);
   const [error, setError] = useState('');
   const [view, setView] = useState<ViewMode>('graph');
@@ -30,6 +32,27 @@ export default function RunDetail() {
       setRun(await api.getRun(runID));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load run');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!runID) return;
+    try {
+      await api.cancelRun(runID);
+      await loadRun();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel run');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!runID) return;
+    if (!window.confirm(`Delete run ${runID}? This cannot be undone.`)) return;
+    try {
+      await api.deleteRun(runID);
+      navigate('/runs');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete run');
     }
   };
 
@@ -52,6 +75,13 @@ export default function RunDetail() {
 
       <div className="page-header">
         <h1 className="page-title">Run {run.run_id}</h1>
+        <div>
+          {(run.status === 'running' || run.status === 'pending') && (
+            <button className="btn btn-danger btn-sm" onClick={handleCancel}>Stop</button>
+          )}
+          {' '}
+          <button className="btn btn-ghost btn-sm" onClick={handleDelete}>Delete</button>
+        </div>
       </div>
 
       <div className="meta-grid">

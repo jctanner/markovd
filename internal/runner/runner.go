@@ -7,6 +7,7 @@ type RunRequest struct {
 	Vars          map[string]string
 	CallbackURL   string
 	CallbackToken string
+	Debug         bool
 }
 
 type Runner interface {

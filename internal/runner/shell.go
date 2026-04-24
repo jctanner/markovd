@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
 )
@@ -25,8 +24,6 @@ func NewShellRunner(markovBin string) *ShellRunner {
 	}
 }
 
-var runIDPattern = regexp.MustCompile(`^run (\S+) `)
-
 func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error) {
 	tmpFile, err := os.CreateTemp("", "markov-workflow-*.yaml")
 	if err != nil {
@@ -39,7 +36,11 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 	}
 	tmpFile.Close()
 
-	args := []string{"run", tmpFile.Name(), "--verbose"}
+	runID := generateRunID()
+	args := []string{"run", tmpFile.Name(), "--verbose", "--run-id", runID}
+	if req.Debug {
+		args = append(args, "--debug")
+	}
 	for k, v := range req.Vars {
 		args = append(args, "--var", fmt.Sprintf("%s=%s", k, v))
 	}
@@ -64,40 +65,22 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 		return "", fmt.Errorf("starting markov: %w", err)
 	}
 
-	runIDCh := make(chan string, 1)
+	r.mu.Lock()
+	r.procs[runID] = cmd.Process
+	r.mu.Unlock()
 
 	go func() {
 		defer os.Remove(tmpFile.Name())
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			line := scanner.Text()
-			log.Printf("[markov] %s", line)
-
-			if matches := runIDPattern.FindStringSubmatch(line); len(matches) > 1 {
-				select {
-				case runIDCh <- matches[1]:
-				default:
-				}
-			}
+			log.Printf("[markov] %s", scanner.Text())
 		}
 		if err := cmd.Wait(); err != nil {
 			log.Printf("[markov] process exited with error: %v", err)
 		}
-		close(runIDCh)
 	}()
 
-	select {
-	case runID := <-runIDCh:
-		if runID == "" {
-			return "", fmt.Errorf("failed to capture run ID from markov output")
-		}
-		r.mu.Lock()
-		r.procs[runID] = cmd.Process
-		r.mu.Unlock()
-		return runID, nil
-	case <-ctx.Done():
-		return "", ctx.Err()
-	}
+	return runID, nil
 }
 
 func (r *ShellRunner) Cancel(runID string) error {

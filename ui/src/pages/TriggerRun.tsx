@@ -8,6 +8,7 @@ export default function TriggerRun() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState('');
   const [vars, setVars] = useState<{ key: string; value: string }[]>([]);
+  const [debug, setDebug] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -35,7 +36,7 @@ export default function TriggerRun() {
       if (v.key) varsMap[v.key] = v.value;
     }
     try {
-      const run = await api.createRun(selectedWorkflow, varsMap);
+      const run = await api.createRun(selectedWorkflow, varsMap, debug);
       navigate(`/runs/${run.run_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger run');
@@ -99,6 +100,17 @@ export default function TriggerRun() {
                 </button>
               </div>
             ))}
+          </div>
+
+          <div className="form-group">
+            <label className="form-checkbox">
+              <input
+                type="checkbox"
+                checked={debug}
+                onChange={(e) => setDebug(e.target.checked)}
+              />
+              Enable debug mode
+            </label>
           </div>
 
           <button type="submit" className="btn btn-primary">

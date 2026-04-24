@@ -50,6 +50,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/auth/login", s.handleLogin)
 		r.Post("/auth/register", s.handleRegister)
 
+		r.Get("/health", s.handleHealth)
 		r.Post("/events", s.handleEvent)
 
 		r.Group(func(r chi.Router) {
@@ -58,10 +59,14 @@ func (s *Server) Router() http.Handler {
 			r.Get("/runs", s.handleListRuns)
 			r.Get("/runs/{runID}", s.handleGetRun)
 			r.Post("/runs", s.handleCreateRun)
+			r.Post("/runs/{runID}/cancel", s.handleCancelRun)
+			r.Delete("/runs/{runID}", s.handleDeleteRun)
 
 			r.Get("/workflows", s.handleListWorkflows)
 			r.Get("/workflows/{name}", s.handleGetWorkflow)
 			r.Post("/workflows", s.handleCreateWorkflow)
+			r.Put("/workflows/{name}", s.handleUpdateWorkflow)
+			r.Delete("/workflows/{name}", s.handleDeleteWorkflow)
 		})
 	})
 
@@ -93,6 +98,14 @@ func (s *Server) jwtMiddleware(next http.Handler) http.Handler {
 func getClaims(r *http.Request) *auth.Claims {
 	claims, _ := r.Context().Value(claimsKey).(*auth.Claims)
 	return claims
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := s.db.PingContext(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unhealthy", "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "healthy"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

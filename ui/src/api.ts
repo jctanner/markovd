@@ -96,10 +96,10 @@ export const api = {
     return request<RunDetail>(`/runs/${runID}`);
   },
 
-  createRun(workflowName: string, vars: Record<string, string>) {
+  createRun(workflowName: string, vars: Record<string, string>, debug = false) {
     return request<Run>('/runs', {
       method: 'POST',
-      body: JSON.stringify({ workflow_name: workflowName, vars }),
+      body: JSON.stringify({ workflow_name: workflowName, vars, debug }),
     });
   },
 
@@ -111,10 +111,43 @@ export const api = {
     return request<Workflow>(`/workflows/${name}`);
   },
 
+  cancelRun(runID: string) {
+    return request<Run>(`/runs/${runID}/cancel`, { method: 'POST' });
+  },
+
+  deleteRun(runID: string) {
+    return fetch(`${BASE}/runs/${runID}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+      },
+    }).then((res) => {
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+    });
+  },
+
   createWorkflow(name: string, yaml: string) {
     return request<Workflow>('/workflows', {
       method: 'POST',
       body: JSON.stringify({ name, yaml }),
+    });
+  },
+
+  updateWorkflow(name: string, yaml: string) {
+    return request<Workflow>(`/workflows/${name}`, {
+      method: 'PUT',
+      body: JSON.stringify({ yaml }),
+    });
+  },
+
+  deleteWorkflow(name: string) {
+    return fetch(`${BASE}/workflows/${name}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+      },
+    }).then((res) => {
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
     });
   },
 };

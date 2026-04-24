@@ -10,6 +10,8 @@ export default function Workflows() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selected, setSelected] = useState<Workflow | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editYaml, setEditYaml] = useState('');
 
   const loadWorkflows = async () => {
     try {
@@ -36,6 +38,47 @@ export default function Workflows() {
     }
   };
 
+  const handleDelete = async (wf: Workflow) => {
+    if (!window.confirm(`Delete workflow "${wf.name}"? This cannot be undone.`)) return;
+    setError('');
+    try {
+      await api.deleteWorkflow(wf.name);
+      if (selected?.id === wf.id) {
+        setSelected(null);
+        setEditing(false);
+      }
+      await loadWorkflows();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete workflow');
+    }
+  };
+
+  const startEdit = () => {
+    if (!selected) return;
+    setEditYaml(selected.yaml);
+    setEditing(true);
+    setError('');
+    setSuccess('');
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+  };
+
+  const saveEdit = async () => {
+    if (!selected) return;
+    setError('');
+    try {
+      const updated = await api.updateWorkflow(selected.name, editYaml);
+      setSelected(updated);
+      setEditing(false);
+      setSuccess(`Workflow "${selected.name}" updated.`);
+      await loadWorkflows();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update workflow');
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -50,6 +93,7 @@ export default function Workflows() {
                 <tr>
                   <th>Name</th>
                   <th>Updated</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -57,17 +101,32 @@ export default function Workflows() {
                   <tr
                     key={wf.id}
                     className={`wf-row${selected?.id === wf.id ? ' selected' : ''}`}
-                    onClick={() => setSelected(wf)}
+                    onClick={() => { setSelected(wf); setEditing(false); }}
                   >
                     <td className="cell-mono">{wf.name}</td>
                     <td className="cell-mono">
                       {new Date(wf.updated_at).toLocaleString()}
                     </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => { setSelected(wf); startEdit(); }}
+                      >
+                        Edit
+                      </button>
+                      {' '}
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDelete(wf)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {workflows.length === 0 && (
                   <tr>
-                    <td colSpan={2} className="table-empty">
+                    <td colSpan={3} className="table-empty">
                       No workflows uploaded yet.
                     </td>
                   </tr>
@@ -76,10 +135,29 @@ export default function Workflows() {
             </table>
           </div>
 
-          {selected && (
+          {selected && !editing && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="section-heading" style={{ margin: 0 }}>{selected.name}</div>
+                <button className="btn btn-sm btn-ghost" onClick={startEdit}>Edit</button>
+              </div>
+              <pre className="yaml-viewer">{selected.yaml}</pre>
+            </div>
+          )}
+
+          {selected && editing && (
             <div style={{ marginTop: 20 }}>
               <div className="section-heading">{selected.name}</div>
-              <pre className="yaml-viewer">{selected.yaml}</pre>
+              <textarea
+                className="form-textarea"
+                value={editYaml}
+                onChange={(e) => setEditYaml(e.target.value)}
+                rows={18}
+              />
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <button className="btn btn-primary btn-sm" onClick={saveEdit}>Save</button>
+                <button className="btn btn-ghost btn-sm" onClick={cancelEdit}>Cancel</button>
+              </div>
             </div>
           )}
         </div>
