@@ -14,6 +14,10 @@ markovd provides an HTTP API and React UI on top of markov, letting users trigge
 
 ![Gantt view](docs/images/gantt-view.png)
 
+**Step table** — tabular view with fork context, status, and durations
+
+![Table view](docs/images/table-view.png)
+
 ## Features
 
 - **Run management** — trigger, list, and inspect workflow runs
