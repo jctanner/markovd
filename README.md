@@ -1,6 +1,6 @@
 # markovd
 
-Web dashboard and API server for the [markov](../markov) workflow engine.
+Web dashboard and API server for the [markov](https://github.com/jctanner/markov) workflow engine.
 
 markovd provides an HTTP API and React UI on top of markov, letting users trigger workflow runs, monitor step execution in real time, and visualize pipeline structure through a browser.
 
