@@ -4,6 +4,16 @@ Web dashboard and API server for the [markov](https://github.com/jctanner/markov
 
 markovd provides an HTTP API and React UI on top of markov, letting users trigger workflow runs, monitor step execution in real time, and visualize pipeline structure through a browser.
 
+## Screenshots
+
+**Workflow graph** — fan-out visualization with status-colored nodes
+
+![Graph view](docs/images/graph-view.png)
+
+**Gantt chart** — step durations and concurrency timeline
+
+![Gantt view](docs/images/gantt-view.png)
+
 ## Features
 
 - **Run management** — trigger, list, and inspect workflow runs
