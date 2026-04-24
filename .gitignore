@@ -1,0 +1,37 @@
+# Binaries
+bin/
+*.exe
+
+# Go
+vendor/
+
+# Node / UI
+ui/node_modules/
+ui/dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+
+# Plans / scratch
+markovd-plan.md
+references/
+
+# Podman / Docker
+*.tar
