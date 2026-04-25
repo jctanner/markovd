@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Run } from '../api';
+import RerunModal from '../components/RerunModal';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -24,8 +25,10 @@ function duration(start: string | null, end: string | null): string {
 }
 
 export default function Runs() {
+  const navigate = useNavigate();
   const [runs, setRuns] = useState<Run[]>([]);
   const [error, setError] = useState('');
+  const [rerunTarget, setRerunTarget] = useState<Run | null>(null);
 
   const loadRuns = async () => {
     try {
@@ -51,6 +54,21 @@ export default function Runs() {
       await loadRuns();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete run');
+    }
+  };
+
+  const handleRerunConfirm = async (
+    vars: Record<string, string>,
+    volumes: { name: string; pvc: string; mount_path: string }[],
+    secretVolumes: { name: string; secret: string; mount_path: string }[],
+  ) => {
+    if (!rerunTarget) return;
+    try {
+      const newRun = await api.createRun(rerunTarget.workflow_name, vars, false, volumes, secretVolumes);
+      setRerunTarget(null);
+      navigate(`/runs/${newRun.run_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to re-run');
     }
   };
 
@@ -107,6 +125,10 @@ export default function Runs() {
                   <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(run.run_id)}>
                     Delete
                   </button>
+                  {' '}
+                  <button className="btn btn-sm btn-ghost" onClick={() => setRerunTarget(run)}>
+                    Re-run
+                  </button>
                 </td>
               </tr>
             ))}
@@ -120,6 +142,12 @@ export default function Runs() {
           </tbody>
         </table>
       </div>
+
+      <RerunModal
+        run={rerunTarget}
+        onClose={() => setRerunTarget(null)}
+        onConfirm={handleRerunConfirm}
+      />
     </div>
   );
 }

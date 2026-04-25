@@ -108,6 +108,8 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 
 	claims := getClaims(r)
 	varsJSON, _ := json.Marshal(req.Vars)
+	volumesJSON, _ := json.Marshal(req.Volumes)
+	secretVolumesJSON, _ := json.Marshal(req.SecretVolumes)
 
 	runReq := runner.RunRequest{
 		WorkflowYAML:  wf.YAML,
@@ -125,7 +127,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run, err := s.db.CreateRun(r.Context(), runID, req.WorkflowName, wf.ID, claims.UserID, string(varsJSON))
+	run, err := s.db.CreateRun(r.Context(), runID, req.WorkflowName, wf.ID, claims.UserID, string(varsJSON), string(volumesJSON), string(secretVolumesJSON))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to record run"})
 		return

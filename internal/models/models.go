@@ -39,16 +39,18 @@ type ProjectFile struct {
 }
 
 type Run struct {
-	ID           int        `json:"id"`
-	RunID        string     `json:"run_id"`
-	WorkflowID   *int       `json:"workflow_id,omitempty"`
-	WorkflowName string     `json:"workflow_name"`
-	Status       string     `json:"status"`
-	TriggeredBy  *int       `json:"triggered_by,omitempty"`
-	VarsJSON     string     `json:"vars_json"`
-	StartedAt    *time.Time `json:"started_at,omitempty"`
-	CompletedAt  *time.Time `json:"completed_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID                int        `json:"id"`
+	RunID             string     `json:"run_id"`
+	WorkflowID        *int       `json:"workflow_id,omitempty"`
+	WorkflowName      string     `json:"workflow_name"`
+	Status            string     `json:"status"`
+	TriggeredBy       *int       `json:"triggered_by,omitempty"`
+	VarsJSON          string     `json:"vars_json"`
+	VolumesJSON       string     `json:"volumes_json"`
+	SecretVolumesJSON string     `json:"secret_volumes_json"`
+	StartedAt         *time.Time `json:"started_at,omitempty"`
+	CompletedAt       *time.Time `json:"completed_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
 }
 
 type Step struct {

@@ -119,6 +119,12 @@ func (d *DB) migrate() error {
 			created_at      TIMESTAMPTZ DEFAULT now(),
 			updated_at      TIMESTAMPTZ DEFAULT now()
 		)`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='runs' AND column_name='volumes_json') THEN
+				ALTER TABLE runs ADD COLUMN volumes_json TEXT DEFAULT '[]';
+				ALTER TABLE runs ADD COLUMN secret_volumes_json TEXT DEFAULT '[]';
+			END IF;
+		END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

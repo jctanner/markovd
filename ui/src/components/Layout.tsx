@@ -52,7 +52,7 @@ export default function Layout() {
           <div className="nav-left">
             <Link to="/" className="nav-brand">
               <div className="nav-brand-icon">M</div>
-              <span className="nav-brand-text">markovd</span>
+              <span className="nav-brand-text">markov<span className="nav-brand-d">d</span></span>
             </Link>
             <div className="nav-links">
               <Link to="/runs" className={linkClass('/runs')}>Runs</Link>

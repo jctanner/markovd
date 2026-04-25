@@ -199,9 +199,13 @@ a:hover {
 
 .nav-brand-text {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--text-primary);
   letter-spacing: -0.03em;
+}
+
+.nav-brand-d {
+  font-weight: 700;
 }
 
 .nav-links {
@@ -1755,4 +1759,53 @@ td.cell-link a:hover {
   font-family: var(--font-mono);
   color: var(--text-primary);
   word-break: break-all;
+}
+
+/* ===== Re-run Modal ===== */
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rerun-workflow-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.rerun-section {
+  margin-bottom: 16px;
+}
+
+.rerun-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.rerun-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.rerun-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.rerun-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }

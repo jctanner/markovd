@@ -70,6 +70,8 @@ export interface Run {
   workflow_name: string;
   status: string;
   vars_json: string;
+  volumes_json: string;
+  secret_volumes_json: string;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;

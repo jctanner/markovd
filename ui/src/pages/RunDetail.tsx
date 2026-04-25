@@ -6,6 +6,7 @@ import StepTable from '../components/StepTable';
 import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
+import RerunModal from '../components/RerunModal';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -27,6 +28,7 @@ export default function RunDetail() {
   const [error, setError] = useState('');
   const [view, setView] = useState<ViewMode>('graph');
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
+  const [showRerun, setShowRerun] = useState(false);
 
   const loadRun = async () => {
     if (!runID) return;
@@ -58,6 +60,21 @@ export default function RunDetail() {
     }
   };
 
+  const handleRerunConfirm = async (
+    vars: Record<string, string>,
+    volumes: { name: string; pvc: string; mount_path: string }[],
+    secretVolumes: { name: string; secret: string; mount_path: string }[],
+  ) => {
+    if (!run) return;
+    try {
+      const newRun = await api.createRun(run.workflow_name, vars, false, volumes, secretVolumes);
+      setShowRerun(false);
+      navigate(`/runs/${newRun.run_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to re-run');
+    }
+  };
+
   const handleStepClick = (step: Step) => setSelectedStep(step);
 
   useEffect(() => {
@@ -85,6 +102,8 @@ export default function RunDetail() {
           )}
           {' '}
           <button className="btn btn-ghost btn-sm" onClick={handleDelete}>Delete</button>
+          {' '}
+          <button className="btn btn-primary btn-sm" onClick={() => setShowRerun(true)}>Re-run</button>
         </div>
       </div>
 
@@ -163,6 +182,11 @@ export default function RunDetail() {
       {view === 'table' && <StepTable steps={run.steps} onStepClick={handleStepClick} />}
 
       <StepDetailModal step={selectedStep} onClose={() => setSelectedStep(null)} />
+      <RerunModal
+        run={showRerun ? run : null}
+        onClose={() => setShowRerun(false)}
+        onConfirm={handleRerunConfirm}
+      />
     </div>
   );
 }
