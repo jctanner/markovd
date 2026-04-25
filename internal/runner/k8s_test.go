@@ -14,14 +14,19 @@ func newTestRunner(secrets []string) *KubernetesRunner {
 }
 
 func newTestRunnerWithVolumes(secrets []string, volumes []PVCMount) *KubernetesRunner {
+	return newTestRunnerFull(secrets, volumes, nil)
+}
+
+func newTestRunnerFull(secrets []string, volumes []PVCMount, secretMounts []SecretMount) *KubernetesRunner {
 	return &KubernetesRunner{
-		client:          fake.NewSimpleClientset(),
-		image:           "ghcr.io/jctanner/markov:latest",
-		imagePullPolicy: corev1.PullIfNotPresent,
-		namespace:       "ai-pipeline",
-		serviceAccount:  "pipeline-agent",
-		secrets:         secrets,
-		defaultVolumes:  volumes,
+		client:              fake.NewSimpleClientset(),
+		image:               "ghcr.io/jctanner/markov:latest",
+		imagePullPolicy:     corev1.PullIfNotPresent,
+		namespace:           "ai-pipeline",
+		serviceAccount:      "pipeline-agent",
+		secrets:             secrets,
+		defaultVolumes:      volumes,
+		defaultSecretMounts: secretMounts,
 	}
 }
 
@@ -470,5 +475,96 @@ func TestParseVolumes(t *testing.T) {
 	vols := ParseVolumes("pipeline-artifacts:/app/artifacts")
 	if vols[0].PVC != "pipeline-artifacts" || vols[0].MountPath != "/app/artifacts" {
 		t.Errorf("ParseVolumes parsed incorrectly: %+v", vols[0])
+	}
+}
+
+func TestStartWithSecretVolumes(t *testing.T) {
+	r := newTestRunnerFull(nil, nil, []SecretMount{
+		{Name: "gcp-creds", Secret: "gcp-credentials", MountPath: "/app/gcloud", ReadOnly: true},
+	})
+	ctx := context.Background()
+
+	runID, err := r.Start(ctx, RunRequest{WorkflowYAML: "test"})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, _ := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	spec := job.Spec.Template.Spec
+
+	if len(spec.Volumes) != 2 {
+		t.Fatalf("expected 2 volumes (workflow + secret), got %d", len(spec.Volumes))
+	}
+	secretVol := spec.Volumes[1]
+	if secretVol.Name != "gcp-creds" {
+		t.Errorf("secret volume name = %q, want %q", secretVol.Name, "gcp-creds")
+	}
+	if secretVol.Secret == nil || secretVol.Secret.SecretName != "gcp-credentials" {
+		t.Errorf("secret volume source mismatch: %+v", secretVol)
+	}
+
+	mounts := spec.Containers[0].VolumeMounts
+	if len(mounts) != 2 {
+		t.Fatalf("expected 2 mounts, got %d", len(mounts))
+	}
+	if mounts[1].MountPath != "/app/gcloud" {
+		t.Errorf("mount path = %q, want %q", mounts[1].MountPath, "/app/gcloud")
+	}
+	if !mounts[1].ReadOnly {
+		t.Error("secret mount should be read-only")
+	}
+}
+
+func TestStartMergesDefaultAndPerRunSecretVolumes(t *testing.T) {
+	r := newTestRunnerFull(nil, nil, []SecretMount{
+		{Name: "default-secret", Secret: "default-secret", MountPath: "/etc/default"},
+	})
+	ctx := context.Background()
+
+	runID, err := r.Start(ctx, RunRequest{
+		WorkflowYAML: "test",
+		SecretVolumes: []SecretMount{
+			{Name: "extra-secret", Secret: "extra-secret", MountPath: "/etc/extra"},
+			{Name: "default-secret", Secret: "default-secret", MountPath: "/etc/override"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, _ := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	spec := job.Spec.Template.Spec
+
+	if len(spec.Volumes) != 3 {
+		t.Fatalf("expected 3 volumes (workflow + 2 secrets, deduped), got %d", len(spec.Volumes))
+	}
+	if len(spec.Containers[0].VolumeMounts) != 3 {
+		t.Fatalf("expected 3 mounts, got %d", len(spec.Containers[0].VolumeMounts))
+	}
+}
+
+func TestParseSecretMounts(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"", 0},
+		{"gcp-creds:/app/gcloud", 1},
+		{"secret1:/mnt/a,secret2:/mnt/b", 2},
+		{" s1:/a , s2:/b , ", 2},
+		{",,,", 0},
+		{"invalid", 0},
+	}
+
+	for _, tt := range tests {
+		got := ParseSecretMounts(tt.input)
+		if len(got) != tt.want {
+			t.Errorf("ParseSecretMounts(%q) len = %d, want %d", tt.input, len(got), tt.want)
+		}
+	}
+
+	mounts := ParseSecretMounts("gcp-creds:/app/gcloud")
+	if mounts[0].Secret != "gcp-creds" || mounts[0].MountPath != "/app/gcloud" {
+		t.Errorf("ParseSecretMounts parsed incorrectly: %+v", mounts[0])
 	}
 }

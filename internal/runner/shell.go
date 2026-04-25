@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -94,4 +95,16 @@ func (r *ShellRunner) Cancel(runID string) error {
 
 func (r *ShellRunner) ListPVCs(ctx context.Context) ([]PVCInfo, error) {
 	return nil, nil
+}
+
+func (r *ShellRunner) ListSecrets(ctx context.Context) ([]SecretInfo, error) {
+	return nil, nil
+}
+
+func (r *ShellRunner) GetJobLogs(ctx context.Context, jobName string) (string, error) {
+	return "", fmt.Errorf("job logs not available in shell mode")
+}
+
+func (r *ShellRunner) StreamJobLogs(ctx context.Context, jobName string) (io.ReadCloser, error) {
+	return nil, fmt.Errorf("log streaming not available in shell mode")
 }

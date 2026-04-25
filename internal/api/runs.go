@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,10 +14,11 @@ import (
 )
 
 type createRunRequest struct {
-	WorkflowName string             `json:"workflow_name"`
-	Vars         map[string]string  `json:"vars"`
-	Debug        bool               `json:"debug"`
-	Volumes      []runner.PVCMount  `json:"volumes,omitempty"`
+	WorkflowName  string               `json:"workflow_name"`
+	Vars          map[string]string    `json:"vars"`
+	Debug         bool                 `json:"debug"`
+	Volumes       []runner.PVCMount    `json:"volumes,omitempty"`
+	SecretVolumes []runner.SecretMount `json:"secret_volumes,omitempty"`
 }
 
 type runDetailResponse struct {
@@ -35,6 +37,19 @@ func (s *Server) handleListPVCs(w http.ResponseWriter, r *http.Request) {
 		pvcs = []runner.PVCInfo{}
 	}
 	writeJSON(w, http.StatusOK, pvcs)
+}
+
+func (s *Server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
+	secrets, err := s.runner.ListSecrets(r.Context())
+	if err != nil {
+		log.Printf("failed to list Secrets: %v", err)
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	if secrets == nil {
+		secrets = []runner.SecretInfo{}
+	}
+	writeJSON(w, http.StatusOK, secrets)
 }
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +116,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		CallbackToken: s.callbackToken,
 		Debug:         req.Debug,
 		Volumes:       req.Volumes,
+		SecretVolumes: req.SecretVolumes,
 	}
 
 	runID, err := s.runner.Start(r.Context(), runReq)
@@ -149,6 +165,66 @@ func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	run.Status = "cancelled"
 	run.CompletedAt = &now
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) handleGetJobLogs(w http.ResponseWriter, r *http.Request) {
+	jobName := chi.URLParam(r, "name")
+	if jobName == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "job name required"})
+		return
+	}
+
+	logs, err := s.runner.GetJobLogs(r.Context(), jobName)
+	if err == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"logs": logs, "job_name": jobName})
+		return
+	}
+
+	cachedLogs, found := s.db.FindCachedJobLogs(r.Context(), jobName)
+	if found {
+		writeJSON(w, http.StatusOK, map[string]string{"logs": cachedLogs, "job_name": jobName, "cached": "true"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"logs": "", "job_name": jobName, "error": err.Error()})
+}
+
+func (s *Server) handleStreamJobLogs(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming not supported"})
+		return
+	}
+
+	jobName := chi.URLParam(r, "name")
+	if jobName == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "job name required"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	stream, err := s.runner.StreamJobLogs(r.Context(), jobName)
+	if err != nil {
+		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		flusher.Flush()
+		return
+	}
+	defer stream.Close()
+
+	scanner := bufio.NewScanner(stream)
+	for scanner.Scan() {
+		if r.Context().Err() != nil {
+			return
+		}
+		fmt.Fprintf(w, "data: %s\n\n", scanner.Text())
+		flusher.Flush()
+	}
+
+	fmt.Fprintf(w, "event: done\ndata: stream ended\n\n")
+	flusher.Flush()
 }
 
 func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {

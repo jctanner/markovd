@@ -7,6 +7,7 @@ import RunDetail from './pages/RunDetail';
 import Workflows from './pages/Workflows';
 import Projects from './pages/Projects';
 import TriggerRun from './pages/TriggerRun';
+import Settings from './pages/Settings';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/workflows" element={<Workflows />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/trigger" element={<TriggerRun />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
       </BrowserRouter>

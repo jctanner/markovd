@@ -111,6 +111,14 @@ func (d *DB) migrate() error {
 					FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE SET NULL;
 			END IF;
 		END $$`,
+		`CREATE TABLE IF NOT EXISTS user_preferences (
+			id              SERIAL PRIMARY KEY,
+			user_id         INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			default_volumes JSONB NOT NULL DEFAULT '[]',
+			default_secrets JSONB NOT NULL DEFAULT '[]',
+			created_at      TIMESTAMPTZ DEFAULT now(),
+			updated_at      TIMESTAMPTZ DEFAULT now()
+		)`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

@@ -59,6 +59,7 @@ export default function Layout() {
               <Link to="/workflows" className={linkClass('/workflows')}>Workflows</Link>
               <Link to="/projects" className={linkClass('/projects')}>Projects</Link>
               <Link to="/trigger" className={linkClass('/trigger')}>Trigger</Link>
+              <Link to="/settings" className={linkClass('/settings')}>Settings</Link>
             </div>
           </div>
           <div className="nav-right">

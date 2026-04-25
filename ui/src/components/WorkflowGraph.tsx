@@ -26,6 +26,7 @@ type StepNodeData = {
   error: string;
   forkId: string;
   workflowName: string;
+  outputJson: string;
 };
 
 const statusBorder: Record<string, string> = {
@@ -59,13 +60,27 @@ function duration(start: string | null, end: string | null): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function parseJobName(outputJson: string): string | null {
+  if (!outputJson) return null;
+  try {
+    const parsed = JSON.parse(outputJson);
+    return parsed.job_name || null;
+  } catch {
+    return null;
+  }
+}
+
 function StepNode({ data }: NodeProps<Node<StepNodeData>>) {
   const border = statusBorder[data.status] || statusBorder.pending;
   const icon = typeIcons[data.stepType] || 'circle';
   const isSub = data.forkId !== '';
+  const jobName = parseJobName(data.outputJson);
 
   return (
-    <div className={`graph-node graph-node-${data.status}${isSub ? ' graph-node-sub' : ''}`} style={{ borderLeftColor: border }}>
+    <div
+      className={`graph-node graph-node-${data.status}${isSub ? ' graph-node-sub' : ''}`}
+      style={{ borderLeftColor: border, cursor: 'pointer' }}
+    >
       <Handle type="target" position={Position.Top} className="graph-handle" />
       <div className="graph-node-top">
         <span className="graph-node-icon" title={data.stepType || 'step'}>
@@ -83,6 +98,7 @@ function StepNode({ data }: NodeProps<Node<StepNodeData>>) {
         </span>
         {data.duration && <span className="graph-node-dur">{data.duration}</span>}
       </div>
+      {jobName && <div className="graph-node-job">{jobName}</div>}
       {data.error && <div className="graph-node-error" title={data.error}>{data.error}</div>}
       <Handle type="source" position={Position.Bottom} className="graph-handle" />
     </div>
@@ -122,9 +138,10 @@ interface ForkGroup {
   steps: Step[];
 }
 
-function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[] } {
-  if (steps.length === 0) return { nodes: [], edges: [] };
+function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]; stepMap: Map<string, Step> } {
+  if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map() };
 
+  const stepMap = new Map<string, Step>();
   const groups = new Map<string, Step[]>();
   for (const step of steps) {
     const fid = step.fork_id || '';
@@ -174,6 +191,7 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
   for (let i = 0; i < mainSteps.length; i++) {
     const step = mainSteps[i];
     const nodeId = `main::${step.step_name}`;
+    stepMap.set(nodeId, step);
     nodes.push({
       id: nodeId,
       type: 'step',
@@ -186,6 +204,7 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
         error: step.error || '',
         forkId: '',
         workflowName: step.workflow_name,
+        outputJson: step.output_json || '',
       },
       draggable: false,
     });
@@ -233,6 +252,7 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
         for (let si = 0; si < nestedSteps.length; si++) {
           const step = nestedSteps[si];
           const nodeId = `${fg.forkId}::${step.step_name}`;
+          stepMap.set(nodeId, step);
           nodes.push({
             id: nodeId,
             type: 'step',
@@ -245,6 +265,7 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
               error: step.error || '',
               forkId: fg.forkId,
               workflowName: step.workflow_name,
+              outputJson: step.output_json || '',
             },
             draggable: false,
           });
@@ -320,7 +341,7 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
   // These aren't laid out yet; place them as additional columns
   // For now, nested sub-workflow steps are included inline in their parent fork
 
-  return { nodes, edges };
+  return { nodes, edges, stepMap };
 }
 
 function useColorMode(): 'dark' | 'light' {
@@ -337,8 +358,13 @@ function useColorMode(): 'dark' | 'light' {
   return mode;
 }
 
-export default function WorkflowGraph({ steps }: { steps: Step[] }) {
-  const { nodes, edges } = useMemo(() => buildGraph(steps), [steps]);
+interface Props {
+  steps: Step[];
+  onStepClick?: (step: Step) => void;
+}
+
+export default function WorkflowGraph({ steps, onStepClick }: Props) {
+  const { nodes, edges, stepMap } = useMemo(() => buildGraph(steps), [steps]);
   const colorMode = useColorMode();
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y), 0);
@@ -347,6 +373,12 @@ export default function WorkflowGraph({ steps }: { steps: Step[] }) {
   const onInit = useCallback((instance: { fitView: () => void }) => {
     setTimeout(() => instance.fitView(), 50);
   }, []);
+
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (!onStepClick) return;
+    const step = stepMap.get(node.id);
+    if (step) onStepClick(step);
+  }, [onStepClick, stepMap]);
 
   if (steps.length === 0) {
     return <div className="graph-empty">Waiting for steps...</div>;
@@ -359,6 +391,7 @@ export default function WorkflowGraph({ steps }: { steps: Step[] }) {
         edges={edges}
         nodeTypes={nodeTypes}
         onInit={onInit}
+        onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.3 }}
         nodesDraggable={false}

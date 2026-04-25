@@ -25,6 +25,7 @@ interface GanttRow {
   stepType: string;
   startMs: number;
   endMs: number;
+  step: Step;
 }
 
 function buildRows(steps: Step[], t0: number, tEnd: number): GanttRow[] {
@@ -58,6 +59,7 @@ function buildRows(steps: Step[], t0: number, tEnd: number): GanttRow[] {
       stepType: s.step_type || '',
       startMs: start - t0,
       endMs: Math.max(end - t0, start - t0 + 1),
+      step: s,
     };
   });
 }
@@ -83,7 +85,22 @@ function getTicks(durationMs: number, chartW: number): number[] {
   return ticks;
 }
 
-export default function GanttChart({ steps }: { steps: Step[] }) {
+function parseJobName(outputJson: string): string | null {
+  if (!outputJson) return null;
+  try {
+    const parsed = JSON.parse(outputJson);
+    return parsed.job_name || null;
+  } catch {
+    return null;
+  }
+}
+
+interface Props {
+  steps: Step[];
+  onStepClick?: (step: Step) => void;
+}
+
+export default function GanttChart({ steps, onStepClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(800);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; row: GanttRow } | null>(null);
@@ -173,6 +190,8 @@ export default function GanttChart({ steps }: { steps: Step[] }) {
               return (
                 <g
                   key={i}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onStepClick?.(row.step)}
                   onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, row })}
                   onMouseMove={e => setTooltip({ x: e.clientX, y: e.clientY, row })}
                   onMouseLeave={() => setTooltip(null)}
@@ -215,6 +234,11 @@ export default function GanttChart({ steps }: { steps: Step[] }) {
             <span>{tooltip.row.workflowName}</span>
             {tooltip.row.stepType && <span> &middot; {tooltip.row.stepType}</span>}
           </div>
+          {parseJobName(tooltip.row.step.output_json) && (
+            <div className="gantt-tooltip-detail">
+              job: {parseJobName(tooltip.row.step.output_json)}
+            </div>
+          )}
           <div className="gantt-tooltip-detail">
             <span className={`gantt-tooltip-status gantt-tooltip-status-${tooltip.row.status}`}>{tooltip.row.status}</span>
             <span> &middot; {formatMs(tooltip.row.endMs - tooltip.row.startMs)}</span>

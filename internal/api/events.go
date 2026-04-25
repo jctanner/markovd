@@ -120,6 +120,17 @@ func (s *Server) processEvent(r *http.Request, runID, eventType string, payload 
 	case "sub_run_started", "sub_run_completed", "sub_run_failed":
 		// stored in events table only; no separate runs row needed
 
+	case "job_created":
+		outputJSON := ""
+		if b, err := json.Marshal(map[string]any{
+			"job_name":  payload["job_name"],
+			"namespace": payload["namespace"],
+		}); err == nil {
+			outputJSON = string(b)
+		}
+		_ = s.db.UpsertStep(ctx, root, fork, getString("workflow_name"), getString("step_name"),
+			getString("step_type"), "running", outputJSON, "", nil, nil)
+
 	case "step_started":
 		_ = s.db.UpsertStep(ctx, root, fork, getString("workflow_name"), getString("step_name"),
 			getString("step_type"), "running", "", "", ts, nil)

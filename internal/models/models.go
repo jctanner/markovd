@@ -72,3 +72,12 @@ type Event struct {
 	Payload    string    `json:"payload"`
 	ReceivedAt time.Time `json:"received_at"`
 }
+
+type UserPreferences struct {
+	ID             int       `json:"id"`
+	UserID         int       `json:"user_id"`
+	DefaultVolumes string    `json:"default_volumes"`
+	DefaultSecrets string    `json:"default_secrets"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}

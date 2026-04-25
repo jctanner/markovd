@@ -65,6 +65,13 @@ func (s *Server) Router() http.Handler {
 			r.Delete("/runs/{runID}", s.handleDeleteRun)
 
 			r.Get("/pvcs", s.handleListPVCs)
+			r.Get("/secrets", s.handleListSecrets)
+
+			r.Get("/preferences", s.handleGetPreferences)
+			r.Put("/preferences", s.handleUpdatePreferences)
+
+			r.Get("/jobs/{name}/logs", s.handleGetJobLogs)
+			r.Get("/jobs/{name}/logs/stream", s.handleStreamJobLogs)
 
 			r.Get("/workflows", s.handleListWorkflows)
 			r.Get("/workflows/{name}", s.handleGetWorkflow)

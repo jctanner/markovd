@@ -20,12 +20,28 @@ function duration(start: string | null, end: string | null): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export default function StepTable({ steps }: { steps: Step[] }) {
+function parseJobName(outputJson: string): string | null {
+  if (!outputJson) return null;
+  try {
+    const parsed = JSON.parse(outputJson);
+    return parsed.job_name || null;
+  } catch {
+    return null;
+  }
+}
+
+interface Props {
+  steps: Step[];
+  onStepClick?: (step: Step) => void;
+}
+
+export default function StepTable({ steps, onStepClick }: Props) {
   if (steps.length === 0) {
     return <div className="table-empty">No steps recorded yet.</div>;
   }
 
   const hasForks = steps.some(s => s.fork_id);
+  const hasJobs = steps.some(s => parseJobName(s.output_json));
 
   return (
     <div className="table-wrap">
@@ -36,25 +52,34 @@ export default function StepTable({ steps }: { steps: Step[] }) {
             {hasForks && <th>Fork</th>}
             <th>Workflow</th>
             <th>Type</th>
+            {hasJobs && <th>Job</th>}
             <th>Status</th>
             <th>Duration</th>
-            <th>Error</th>
           </tr>
         </thead>
         <tbody>
-          {steps.map((step) => (
-            <tr key={`${step.fork_id || ''}-${step.workflow_name}-${step.step_name}`}>
-              <td className="cell-mono">{step.step_name}</td>
-              {hasForks && <td className="cell-mono cell-fork">{step.fork_id || '-'}</td>}
-              <td>{step.workflow_name}</td>
-              <td>{step.step_type || '-'}</td>
-              <td>
-                <span className={badgeClass(step.status)}>{step.status}</span>
-              </td>
-              <td className="cell-mono">{duration(step.started_at, step.completed_at)}</td>
-              <td className="cell-error">{step.error || ''}</td>
-            </tr>
-          ))}
+          {steps.map((step) => {
+            const jobName = parseJobName(step.output_json);
+            return (
+              <tr
+                key={`${step.fork_id || ''}-${step.workflow_name}-${step.step_name}`}
+                className="step-row-clickable"
+                onClick={() => onStepClick?.(step)}
+              >
+                <td className="cell-mono">{step.step_name}</td>
+                {hasForks && <td className="cell-mono cell-fork">{step.fork_id || '-'}</td>}
+                <td>{step.workflow_name}</td>
+                <td>{step.step_type || '-'}</td>
+                {hasJobs && (
+                  <td className="cell-mono">{jobName || '-'}</td>
+                )}
+                <td>
+                  <span className={badgeClass(step.status)}>{step.status}</span>
+                </td>
+                <td className="cell-mono">{duration(step.started_at, step.completed_at)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

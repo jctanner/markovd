@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -45,6 +46,26 @@ func (d *DB) UpsertStep(ctx context.Context, runID, forkID, workflowName, stepNa
 		runID, forkID, workflowName, stepName, stepType, status, nullIfEmpty(outputJSON), nullIfEmpty(stepError), startedAt, completedAt,
 	)
 	return err
+}
+
+func (d *DB) FindCachedJobLogs(ctx context.Context, jobName string) (string, bool) {
+	var outputJSON string
+	err := d.QueryRowContext(ctx,
+		`SELECT COALESCE(output_json, '') FROM steps
+		 WHERE output_json LIKE $1 LIMIT 1`,
+		fmt.Sprintf("%%\"job_name\":\"%s\"%%", jobName),
+	).Scan(&outputJSON)
+	if err != nil || outputJSON == "" {
+		return "", false
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(outputJSON), &parsed); err != nil {
+		return "", false
+	}
+	if logs, ok := parsed["logs"].(string); ok && logs != "" {
+		return logs, true
+	}
+	return "", false
 }
 
 func nullIfEmpty(s string) *string {

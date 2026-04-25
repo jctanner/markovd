@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { RunDetail as RunDetailType } from '../api';
+import type { RunDetail as RunDetailType, Step } from '../api';
 import StepTable from '../components/StepTable';
 import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
+import StepDetailModal from '../components/StepDetailModal';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function RunDetail() {
   const [run, setRun] = useState<RunDetailType | null>(null);
   const [error, setError] = useState('');
   const [view, setView] = useState<ViewMode>('graph');
+  const [selectedStep, setSelectedStep] = useState<Step | null>(null);
 
   const loadRun = async () => {
     if (!runID) return;
@@ -55,6 +57,8 @@ export default function RunDetail() {
       setError(err instanceof Error ? err.message : 'Failed to delete run');
     }
   };
+
+  const handleStepClick = (step: Step) => setSelectedStep(step);
 
   useEffect(() => {
     loadRun();
@@ -109,6 +113,27 @@ export default function RunDetail() {
         </div>
       </div>
 
+      {(() => {
+        try {
+          const vars = JSON.parse(run.vars_json || '{}');
+          const entries = Object.entries(vars);
+          if (entries.length === 0) return null;
+          return (
+            <div className="run-vars-card">
+              <div className="meta-label">Variables</div>
+              <div className="run-vars-list">
+                {entries.map(([k, v]) => (
+                  <div key={k} className="run-vars-row">
+                    <span className="run-vars-key">{k}</span>
+                    <span className="run-vars-val">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div className="section-heading" style={{ margin: 0, flex: 1 }}>Steps</div>
         <div className="view-toggle">
@@ -133,9 +158,11 @@ export default function RunDetail() {
         </div>
       </div>
 
-      {view === 'graph' && <WorkflowGraph steps={run.steps} />}
-      {view === 'gantt' && <GanttChart steps={run.steps} />}
-      {view === 'table' && <StepTable steps={run.steps} />}
+      {view === 'graph' && <WorkflowGraph steps={run.steps} onStepClick={handleStepClick} />}
+      {view === 'gantt' && <GanttChart steps={run.steps} onStepClick={handleStepClick} />}
+      {view === 'table' && <StepTable steps={run.steps} onStepClick={handleStepClick} />}
+
+      <StepDetailModal step={selectedStep} onClose={() => setSelectedStep(null)} />
     </div>
   );
 }

@@ -98,6 +98,21 @@ export interface PVCInfo {
   status: string;
 }
 
+export interface SecretInfo {
+  name: string;
+  type: string;
+}
+
+export interface VolumeDefault {
+  name: string;
+  mount_path: string;
+}
+
+export interface UserPreferences {
+  default_volumes: VolumeDefault[];
+  default_secrets: VolumeDefault[];
+}
+
 export const api = {
   login(username: string, password: string) {
     return request<{ token: string }>('/auth/login', {
@@ -117,6 +132,27 @@ export const api = {
     return request<PVCInfo[]>('/pvcs');
   },
 
+  listSecrets() {
+    return request<SecretInfo[]>('/secrets');
+  },
+
+  getPreferences() {
+    return request<UserPreferences>('/preferences');
+  },
+
+  updatePreferences(prefs: UserPreferences) {
+    return request<UserPreferences>('/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    });
+  },
+
+  getJobLogs(jobName: string) {
+    return request<{ logs: string; job_name: string; cached?: string; error?: string }>(
+      `/jobs/${encodeURIComponent(jobName)}/logs`
+    );
+  },
+
   listRuns() {
     return request<Run[]>('/runs');
   },
@@ -125,9 +161,10 @@ export const api = {
     return request<RunDetail>(`/runs/${runID}`);
   },
 
-  createRun(workflowName: string, vars: Record<string, string>, debug = false, volumes: { name: string; pvc: string; mount_path: string }[] = []) {
+  createRun(workflowName: string, vars: Record<string, string>, debug = false, volumes: { name: string; pvc: string; mount_path: string }[] = [], secretVolumes: { name: string; secret: string; mount_path: string }[] = []) {
     const body: Record<string, unknown> = { workflow_name: workflowName, vars, debug };
     if (volumes.length > 0) body.volumes = volumes;
+    if (secretVolumes.length > 0) body.secret_volumes = secretVolumes;
     return request<Run>('/runs', {
       method: 'POST',
       body: JSON.stringify(body),
