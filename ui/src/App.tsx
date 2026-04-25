@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Runs from './pages/Runs';
 import RunDetail from './pages/RunDetail';
 import Workflows from './pages/Workflows';
+import Projects from './pages/Projects';
 import TriggerRun from './pages/TriggerRun';
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/runs" element={<Runs />} />
             <Route path="/runs/:runID" element={<RunDetail />} />
             <Route path="/workflows" element={<Workflows />} />
+            <Route path="/projects" element={<Projects />} />
             <Route path="/trigger" element={<TriggerRun />} />
           </Route>
         </Routes>

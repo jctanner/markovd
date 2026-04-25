@@ -14,9 +14,9 @@ func (d *DB) CreateWorkflow(ctx context.Context, name, yaml string, uploadedBy i
 		`INSERT INTO workflows (name, yaml, uploaded_by)
 		 VALUES ($1, $2, $3)
 		 ON CONFLICT (name) DO UPDATE SET yaml = $2, updated_at = now()
-		 RETURNING id, name, yaml, uploaded_by, created_at, updated_at`,
+		 RETURNING id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at`,
 		name, yaml, uploadedBy,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating workflow: %w", err)
 	}
@@ -25,7 +25,7 @@ func (d *DB) CreateWorkflow(ctx context.Context, name, yaml string, uploadedBy i
 
 func (d *DB) ListWorkflows(ctx context.Context) ([]models.Workflow, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, name, yaml, uploaded_by, created_at, updated_at
+		`SELECT id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at
 		 FROM workflows ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("listing workflows: %w", err)
@@ -35,7 +35,7 @@ func (d *DB) ListWorkflows(ctx context.Context) ([]models.Workflow, error) {
 	var workflows []models.Workflow
 	for rows.Next() {
 		var w models.Workflow
-		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning workflow: %w", err)
 		}
 		workflows = append(workflows, w)
@@ -47,9 +47,9 @@ func (d *DB) UpdateWorkflow(ctx context.Context, name, yaml string) (*models.Wor
 	var w models.Workflow
 	err := d.QueryRowContext(ctx,
 		`UPDATE workflows SET yaml = $2, updated_at = now() WHERE name = $1
-		 RETURNING id, name, yaml, uploaded_by, created_at, updated_at`,
+		 RETURNING id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at`,
 		name, yaml,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -74,9 +74,9 @@ func (d *DB) DeleteWorkflow(ctx context.Context, name string) error {
 func (d *DB) GetWorkflowByName(ctx context.Context, name string) (*models.Workflow, error) {
 	var w models.Workflow
 	err := d.QueryRowContext(ctx,
-		`SELECT id, name, yaml, uploaded_by, created_at, updated_at
+		`SELECT id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at
 		 FROM workflows WHERE name = $1`, name,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

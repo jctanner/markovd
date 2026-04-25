@@ -21,9 +21,10 @@ type Server struct {
 	runner        runner.Runner
 	callbackToken string
 	callbackURL   string
+	projectsDir   string
 }
 
-func NewServer(database *db.DB, authProvider auth.Provider, jwtMgr *auth.JWTManager, r runner.Runner, callbackToken, callbackURL string) *Server {
+func NewServer(database *db.DB, authProvider auth.Provider, jwtMgr *auth.JWTManager, r runner.Runner, callbackToken, callbackURL, projectsDir string) *Server {
 	return &Server{
 		db:            database,
 		auth:          authProvider,
@@ -31,6 +32,7 @@ func NewServer(database *db.DB, authProvider auth.Provider, jwtMgr *auth.JWTMana
 		runner:        r,
 		callbackToken: callbackToken,
 		callbackURL:   callbackURL,
+		projectsDir:   projectsDir,
 	}
 }
 
@@ -67,6 +69,14 @@ func (s *Server) Router() http.Handler {
 			r.Post("/workflows", s.handleCreateWorkflow)
 			r.Put("/workflows/{name}", s.handleUpdateWorkflow)
 			r.Delete("/workflows/{name}", s.handleDeleteWorkflow)
+
+			r.Get("/projects", s.handleListProjects)
+			r.Post("/projects", s.handleCreateProject)
+			r.Get("/projects/{id}", s.handleGetProject)
+			r.Delete("/projects/{id}", s.handleDeleteProject)
+			r.Post("/projects/{id}/sync", s.handleSyncProject)
+			r.Get("/projects/{id}/files", s.handleListProjectFiles)
+			r.Post("/projects/{id}/import", s.handleImportProjectFiles)
 		})
 	})
 

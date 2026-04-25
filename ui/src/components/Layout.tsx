@@ -57,6 +57,7 @@ export default function Layout() {
             <div className="nav-links">
               <Link to="/runs" className={linkClass('/runs')}>Runs</Link>
               <Link to="/workflows" className={linkClass('/workflows')}>Workflows</Link>
+              <Link to="/projects" className={linkClass('/projects')}>Projects</Link>
               <Link to="/trigger" className={linkClass('/trigger')}>Trigger</Link>
             </div>
           </div>

@@ -35,5 +35,8 @@ kubeconfig.yaml
 markovd-plan.md
 references/
 
+# Data / cloned projects
+data/
+
 # Podman / Docker
 *.tar

@@ -14,8 +14,28 @@ type Workflow struct {
 	Name       string    `json:"name"`
 	YAML       string    `json:"yaml"`
 	UploadedBy int       `json:"uploaded_by"`
+	ProjectID  *int      `json:"project_id,omitempty"`
+	SourcePath string    `json:"source_path,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type Project struct {
+	ID           int        `json:"id"`
+	Name         string     `json:"name"`
+	URL          string     `json:"url"`
+	Branch       string     `json:"branch"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	SyncStatus   string     `json:"sync_status"`
+	SyncError    string     `json:"sync_error,omitempty"`
+	CreatedBy    int        `json:"created_by"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type ProjectFile struct {
+	Path     string `json:"path"`
+	Imported bool   `json:"imported"`
 }
 
 type Run struct {

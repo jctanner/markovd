@@ -40,8 +40,28 @@ export interface Workflow {
   name: string;
   yaml: string;
   uploaded_by: number;
+  project_id?: number;
+  source_path?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  url: string;
+  branch: string;
+  last_synced_at: string | null;
+  sync_status: string;
+  sync_error: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectFile {
+  path: string;
+  imported: boolean;
 }
 
 export interface Run {
@@ -148,6 +168,47 @@ export const api = {
       },
     }).then((res) => {
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+    });
+  },
+
+  listProjects() {
+    return request<Project[]>('/projects');
+  },
+
+  createProject(name: string, url: string, branch: string) {
+    return request<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, url, branch }),
+    });
+  },
+
+  getProject(id: number) {
+    return request<Project>(`/projects/${id}`);
+  },
+
+  deleteProject(id: number) {
+    return fetch(`${BASE}/projects/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+      },
+    }).then((res) => {
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+    });
+  },
+
+  syncProject(id: number) {
+    return request<Project>(`/projects/${id}/sync`, { method: 'POST' });
+  },
+
+  listProjectFiles(id: number) {
+    return request<ProjectFile[]>(`/projects/${id}/files`);
+  },
+
+  importProjectFiles(id: number, files: string[]) {
+    return request<{ name: string; path: string; error?: string }[]>(`/projects/${id}/import`, {
+      method: 'POST',
+      body: JSON.stringify({ files }),
     });
   },
 };

@@ -54,7 +54,7 @@ export default function Workflows() {
   };
 
   const startEdit = () => {
-    if (!selected) return;
+    if (!selected || selected.project_id) return;
     setEditYaml(selected.yaml);
     setEditing(true);
     setError('');
@@ -92,6 +92,7 @@ export default function Workflows() {
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Source</th>
                   <th>Updated</th>
                   <th>Actions</th>
                 </tr>
@@ -104,16 +105,24 @@ export default function Workflows() {
                     onClick={() => { setSelected(wf); setEditing(false); }}
                   >
                     <td className="cell-mono">{wf.name}</td>
+                    <td>
+                      {wf.project_id
+                        ? <span className="source-badge source-badge-project">Project</span>
+                        : <span className="source-badge source-badge-manual">Manual</span>
+                      }
+                    </td>
                     <td className="cell-mono">
                       {new Date(wf.updated_at).toLocaleString()}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => { setSelected(wf); startEdit(); }}
-                      >
-                        Edit
-                      </button>
+                      {!wf.project_id && (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => { setSelected(wf); startEdit(); }}
+                        >
+                          Edit
+                        </button>
+                      )}
                       {' '}
                       <button
                         className="btn btn-sm btn-danger"
@@ -126,7 +135,7 @@ export default function Workflows() {
                 ))}
                 {workflows.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="table-empty">
+                    <td colSpan={4} className="table-empty">
                       No workflows uploaded yet.
                     </td>
                   </tr>
@@ -139,8 +148,15 @@ export default function Workflows() {
             <div style={{ marginTop: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div className="section-heading" style={{ margin: 0 }}>{selected.name}</div>
-                <button className="btn btn-sm btn-ghost" onClick={startEdit}>Edit</button>
+                {!selected.project_id && (
+                  <button className="btn btn-sm btn-ghost" onClick={startEdit}>Edit</button>
+                )}
               </div>
+              {selected.source_path && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  Source: {selected.source_path}
+                </div>
+              )}
               <pre className="yaml-viewer">{selected.yaml}</pre>
             </div>
           )}

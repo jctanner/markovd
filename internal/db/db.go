@@ -82,6 +82,25 @@ func (d *DB) migrate() error {
 			payload     JSONB NOT NULL,
 			received_at TIMESTAMPTZ DEFAULT now()
 		)`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			id              SERIAL PRIMARY KEY,
+			name            TEXT UNIQUE NOT NULL,
+			url             TEXT NOT NULL,
+			branch          TEXT NOT NULL DEFAULT 'main',
+			clone_path      TEXT NOT NULL DEFAULT '',
+			last_synced_at  TIMESTAMPTZ,
+			sync_status     TEXT NOT NULL DEFAULT 'idle',
+			sync_error      TEXT NOT NULL DEFAULT '',
+			created_by      INTEGER REFERENCES users(id),
+			created_at      TIMESTAMPTZ DEFAULT now(),
+			updated_at      TIMESTAMPTZ DEFAULT now()
+		)`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='workflows' AND column_name='project_id') THEN
+				ALTER TABLE workflows ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+				ALTER TABLE workflows ADD COLUMN source_path TEXT NOT NULL DEFAULT '';
+			END IF;
+		END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

@@ -31,6 +31,7 @@ func main() {
 	jobSA := envOr("MARKOVD_JOB_SERVICE_ACCOUNT", "pipeline-agent")
 	jobImagePullPolicy := envOr("MARKOVD_JOB_IMAGE_PULL_POLICY", "")
 	jobSecrets := envOr("MARKOVD_JOB_SECRETS", "")
+	projectsDir := envOr("MARKOVD_PROJECTS_DIR", "./data/projects")
 
 	if jwtSecret == "" {
 		jwtSecret = generateSecret()
@@ -79,7 +80,11 @@ func main() {
 		log.Fatalf("Unknown MARKOVD_RUNNER value: %q (expected 'shell' or 'kubernetes')", runnerType)
 	}
 
-	srv := api.NewServer(database, authProvider, jwtMgr, r, callbackToken, callbackURL)
+	if err := os.MkdirAll(projectsDir, 0755); err != nil {
+		log.Fatalf("Failed to create projects directory: %v", err)
+	}
+
+	srv := api.NewServer(database, authProvider, jwtMgr, r, callbackToken, callbackURL, projectsDir)
 
 	log.Printf("Starting markovd on :%s", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), srv.Router()); err != nil {
