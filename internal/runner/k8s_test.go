@@ -10,6 +10,10 @@ import (
 )
 
 func newTestRunner(secrets []string) *KubernetesRunner {
+	return newTestRunnerWithVolumes(secrets, nil)
+}
+
+func newTestRunnerWithVolumes(secrets []string, volumes []PVCMount) *KubernetesRunner {
 	return &KubernetesRunner{
 		client:          fake.NewSimpleClientset(),
 		image:           "ghcr.io/jctanner/markov:latest",
@@ -17,6 +21,7 @@ func newTestRunner(secrets []string) *KubernetesRunner {
 		namespace:       "ai-pipeline",
 		serviceAccount:  "pipeline-agent",
 		secrets:         secrets,
+		defaultVolumes:  volumes,
 	}
 }
 
@@ -350,5 +355,120 @@ func TestJobSpecDetails(t *testing.T) {
 	}
 	if vols[0].ConfigMap == nil || vols[0].ConfigMap.Name != runID+"-workflow" {
 		t.Errorf("volume should reference configmap %s-workflow", runID)
+	}
+}
+
+func TestStartWithDefaultPVCVolumes(t *testing.T) {
+	r := newTestRunnerWithVolumes(nil, []PVCMount{
+		{Name: "pipeline-artifacts", PVC: "pipeline-artifacts", MountPath: "/app/artifacts"},
+	})
+	ctx := context.Background()
+
+	runID, err := r.Start(ctx, RunRequest{WorkflowYAML: "test"})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, _ := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	spec := job.Spec.Template.Spec
+
+	if len(spec.Volumes) != 2 {
+		t.Fatalf("expected 2 volumes (workflow + pvc), got %d", len(spec.Volumes))
+	}
+	pvcVol := spec.Volumes[1]
+	if pvcVol.Name != "pipeline-artifacts" {
+		t.Errorf("PVC volume name = %q, want %q", pvcVol.Name, "pipeline-artifacts")
+	}
+	if pvcVol.PersistentVolumeClaim == nil || pvcVol.PersistentVolumeClaim.ClaimName != "pipeline-artifacts" {
+		t.Errorf("PVC claim name mismatch")
+	}
+
+	mounts := spec.Containers[0].VolumeMounts
+	if len(mounts) != 2 {
+		t.Fatalf("expected 2 volume mounts, got %d", len(mounts))
+	}
+	if mounts[1].MountPath != "/app/artifacts" {
+		t.Errorf("PVC mount path = %q, want %q", mounts[1].MountPath, "/app/artifacts")
+	}
+}
+
+func TestStartWithPerRunPVCVolumes(t *testing.T) {
+	r := newTestRunner(nil)
+	ctx := context.Background()
+
+	runID, err := r.Start(ctx, RunRequest{
+		WorkflowYAML: "test",
+		Volumes: []PVCMount{
+			{Name: "data-vol", PVC: "my-data-pvc", MountPath: "/data"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, _ := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	spec := job.Spec.Template.Spec
+
+	if len(spec.Volumes) != 2 {
+		t.Fatalf("expected 2 volumes, got %d", len(spec.Volumes))
+	}
+	if spec.Volumes[1].PersistentVolumeClaim.ClaimName != "my-data-pvc" {
+		t.Errorf("PVC claim = %q, want %q", spec.Volumes[1].PersistentVolumeClaim.ClaimName, "my-data-pvc")
+	}
+	if spec.Containers[0].VolumeMounts[1].MountPath != "/data" {
+		t.Errorf("mount path = %q, want %q", spec.Containers[0].VolumeMounts[1].MountPath, "/data")
+	}
+}
+
+func TestStartMergesDefaultAndPerRunVolumes(t *testing.T) {
+	r := newTestRunnerWithVolumes(nil, []PVCMount{
+		{Name: "default-vol", PVC: "default-pvc", MountPath: "/default"},
+	})
+	ctx := context.Background()
+
+	runID, err := r.Start(ctx, RunRequest{
+		WorkflowYAML: "test",
+		Volumes: []PVCMount{
+			{Name: "extra-vol", PVC: "extra-pvc", MountPath: "/extra"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, _ := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	spec := job.Spec.Template.Spec
+
+	if len(spec.Volumes) != 3 {
+		t.Fatalf("expected 3 volumes (workflow + 2 PVCs), got %d", len(spec.Volumes))
+	}
+	if len(spec.Containers[0].VolumeMounts) != 3 {
+		t.Fatalf("expected 3 mounts, got %d", len(spec.Containers[0].VolumeMounts))
+	}
+}
+
+func TestParseVolumes(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"", 0},
+		{"pipeline-artifacts:/app/artifacts", 1},
+		{"pvc1:/mnt/a,pvc2:/mnt/b", 2},
+		{" pvc1:/mnt/a , pvc2:/mnt/b , ", 2},
+		{",,,", 0},
+		{"invalid", 0},
+	}
+
+	for _, tt := range tests {
+		got := ParseVolumes(tt.input)
+		if len(got) != tt.want {
+			t.Errorf("ParseVolumes(%q) len = %d, want %d", tt.input, len(got), tt.want)
+		}
+	}
+
+	vols := ParseVolumes("pipeline-artifacts:/app/artifacts")
+	if vols[0].PVC != "pipeline-artifacts" || vols[0].MountPath != "/app/artifacts" {
+		t.Errorf("ParseVolumes parsed incorrectly: %+v", vols[0])
 	}
 }

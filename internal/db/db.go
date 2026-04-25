@@ -101,6 +101,16 @@ func (d *DB) migrate() error {
 				ALTER TABLE workflows ADD COLUMN source_path TEXT NOT NULL DEFAULT '';
 			END IF;
 		END $$`,
+		`DO $$ BEGIN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.table_constraints
+				WHERE constraint_name = 'runs_workflow_id_fkey' AND table_name = 'runs'
+			) THEN
+				ALTER TABLE runs DROP CONSTRAINT runs_workflow_id_fkey;
+				ALTER TABLE runs ADD CONSTRAINT runs_workflow_id_fkey
+					FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE SET NULL;
+			END IF;
+		END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

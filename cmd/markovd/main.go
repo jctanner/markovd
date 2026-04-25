@@ -31,6 +31,7 @@ func main() {
 	jobSA := envOr("MARKOVD_JOB_SERVICE_ACCOUNT", "pipeline-agent")
 	jobImagePullPolicy := envOr("MARKOVD_JOB_IMAGE_PULL_POLICY", "")
 	jobSecrets := envOr("MARKOVD_JOB_SECRETS", "")
+	jobVolumes := envOr("MARKOVD_JOB_VOLUMES", "")
 	projectsDir := envOr("MARKOVD_PROJECTS_DIR", "./data/projects")
 
 	if jwtSecret == "" {
@@ -71,7 +72,7 @@ func main() {
 			}
 		}
 		var err error
-		r, err = runner.NewKubernetesRunner(markovImage, jobImagePullPolicy, jobNamespace, jobSA, runner.ParseSecrets(jobSecrets))
+		r, err = runner.NewKubernetesRunner(markovImage, jobImagePullPolicy, jobNamespace, jobSA, runner.ParseSecrets(jobSecrets), runner.ParseVolumes(jobVolumes))
 		if err != nil {
 			log.Fatalf("Failed to create kubernetes runner: %v", err)
 		}

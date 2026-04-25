@@ -1297,3 +1297,70 @@ td.cell-link a:hover {
   color: var(--text-muted);
   background: rgba(148, 163, 184, 0.1);
 }
+
+/* ===== PVC VOLUME SELECTOR ===== */
+
+.pvc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pvc-item {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  transition: all var(--ease-fast);
+}
+
+.pvc-item:hover {
+  border-color: var(--border-hover);
+}
+
+.pvc-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.pvc-item-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pvc-item-label input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.pvc-item-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.pvc-mount-input {
+  margin-top: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-root);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: all var(--ease-fast);
+}
+
+.pvc-mount-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.pvc-mount-input::placeholder {
+  color: var(--text-muted);
+}

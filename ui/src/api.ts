@@ -93,6 +93,11 @@ export interface RunDetail extends Run {
   steps: Step[];
 }
 
+export interface PVCInfo {
+  name: string;
+  status: string;
+}
+
 export const api = {
   login(username: string, password: string) {
     return request<{ token: string }>('/auth/login', {
@@ -108,6 +113,10 @@ export const api = {
     });
   },
 
+  listPVCs() {
+    return request<PVCInfo[]>('/pvcs');
+  },
+
   listRuns() {
     return request<Run[]>('/runs');
   },
@@ -116,10 +125,12 @@ export const api = {
     return request<RunDetail>(`/runs/${runID}`);
   },
 
-  createRun(workflowName: string, vars: Record<string, string>, debug = false) {
+  createRun(workflowName: string, vars: Record<string, string>, debug = false, volumes: { name: string; pvc: string; mount_path: string }[] = []) {
+    const body: Record<string, unknown> = { workflow_name: workflowName, vars, debug };
+    if (volumes.length > 0) body.volumes = volumes;
     return request<Run>('/runs', {
       method: 'POST',
-      body: JSON.stringify({ workflow_name: workflowName, vars, debug }),
+      body: JSON.stringify(body),
     });
   },
 

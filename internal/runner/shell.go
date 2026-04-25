@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 )
 
@@ -93,7 +92,6 @@ func (r *ShellRunner) Cancel(runID string) error {
 	return proc.Kill()
 }
 
-// sanitizeForShell is unused for now but reserved for future container runner.
-func sanitizeForShell(s string) string {
-	return strings.ReplaceAll(s, "'", "'\\''")
+func (r *ShellRunner) ListPVCs(ctx context.Context) ([]PVCInfo, error) {
+	return nil, nil
 }

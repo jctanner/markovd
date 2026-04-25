@@ -2,18 +2,21 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Workflow } from '../api';
+import type { Workflow, PVCInfo } from '../api';
 
 export default function TriggerRun() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [pvcs, setPvcs] = useState<PVCInfo[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState('');
   const [vars, setVars] = useState<{ key: string; value: string }[]>([]);
+  const [selectedPVCs, setSelectedPVCs] = useState<Record<string, string>>({});
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     api.listWorkflows().then(setWorkflows).catch(() => {});
+    api.listPVCs().then(setPvcs).catch(() => {});
   }, []);
 
   const addVar = () => setVars([...vars, { key: '', value: '' }]);
@@ -22,6 +25,22 @@ export default function TriggerRun() {
     const updated = [...vars];
     updated[i][field] = val;
     setVars(updated);
+  };
+
+  const togglePVC = (name: string) => {
+    setSelectedPVCs(prev => {
+      const next = { ...prev };
+      if (name in next) {
+        delete next[name];
+      } else {
+        next[name] = `/mnt/${name}`;
+      }
+      return next;
+    });
+  };
+
+  const updateMountPath = (name: string, path: string) => {
+    setSelectedPVCs(prev => ({ ...prev, [name]: path }));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -35,8 +54,11 @@ export default function TriggerRun() {
     for (const v of vars) {
       if (v.key) varsMap[v.key] = v.value;
     }
+    const volsList = Object.entries(selectedPVCs)
+      .filter(([, path]) => path)
+      .map(([name, path]) => ({ name, pvc: name, mount_path: path }));
     try {
-      const run = await api.createRun(selectedWorkflow, varsMap, debug);
+      const run = await api.createRun(selectedWorkflow, varsMap, debug, volsList);
       navigate(`/runs/${run.run_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger run');
@@ -101,6 +123,41 @@ export default function TriggerRun() {
               </div>
             ))}
           </div>
+
+          {pvcs.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">PVC Volumes</label>
+              <div className="pvc-list">
+                {pvcs.map((p) => {
+                  const checked = p.name in selectedPVCs;
+                  return (
+                    <div key={p.name} className={`pvc-item${checked ? ' selected' : ''}`}>
+                      <label className="pvc-item-label">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePVC(p.name)}
+                        />
+                        <span className="pvc-item-name">{p.name}</span>
+                        <span className={`badge badge-${p.status === 'Bound' ? 'completed' : 'pending'}`} style={{ marginLeft: 8 }}>
+                          {p.status}
+                        </span>
+                      </label>
+                      {checked && (
+                        <input
+                          type="text"
+                          className="form-input pvc-mount-input"
+                          value={selectedPVCs[p.name]}
+                          onChange={(e) => updateMountPath(p.name, e.target.value)}
+                          placeholder="/mnt/..."
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-checkbox">

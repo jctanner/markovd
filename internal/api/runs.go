@@ -13,14 +13,28 @@ import (
 )
 
 type createRunRequest struct {
-	WorkflowName string            `json:"workflow_name"`
-	Vars         map[string]string `json:"vars"`
-	Debug        bool              `json:"debug"`
+	WorkflowName string             `json:"workflow_name"`
+	Vars         map[string]string  `json:"vars"`
+	Debug        bool               `json:"debug"`
+	Volumes      []runner.PVCMount  `json:"volumes,omitempty"`
 }
 
 type runDetailResponse struct {
 	models.Run
 	Steps []models.Step `json:"steps"`
+}
+
+func (s *Server) handleListPVCs(w http.ResponseWriter, r *http.Request) {
+	pvcs, err := s.runner.ListPVCs(r.Context())
+	if err != nil {
+		log.Printf("failed to list PVCs: %v", err)
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	if pvcs == nil {
+		pvcs = []runner.PVCInfo{}
+	}
+	writeJSON(w, http.StatusOK, pvcs)
 }
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +100,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		CallbackURL:   s.callbackURL,
 		CallbackToken: s.callbackToken,
 		Debug:         req.Debug,
+		Volumes:       req.Volumes,
 	}
 
 	runID, err := s.runner.Start(r.Context(), runReq)

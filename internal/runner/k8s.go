@@ -21,9 +21,10 @@ type KubernetesRunner struct {
 	namespace       string
 	serviceAccount  string
 	secrets         []string
+	defaultVolumes  []PVCMount
 }
 
-func NewKubernetesRunner(image, imagePullPolicy, namespace, serviceAccount string, secrets []string) (*KubernetesRunner, error) {
+func NewKubernetesRunner(image, imagePullPolicy, namespace, serviceAccount string, secrets []string, defaultVolumes []PVCMount) (*KubernetesRunner, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("k8s in-cluster config: %w", err)
@@ -46,6 +47,7 @@ func NewKubernetesRunner(image, imagePullPolicy, namespace, serviceAccount strin
 		namespace:       namespace,
 		serviceAccount:  serviceAccount,
 		secrets:         secrets,
+		defaultVolumes:  defaultVolumes,
 	}, nil
 }
 
@@ -98,6 +100,47 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 		})
 	}
 
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "workflow",
+			MountPath: "/etc/markov",
+			ReadOnly:  true,
+		},
+	}
+	volumes := []corev1.Volume{
+		{
+			Name: "workflow",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+				},
+			},
+		},
+	}
+
+	allPVCs := append(r.defaultVolumes, req.Volumes...)
+	seen := map[string]bool{}
+	for _, pvc := range allPVCs {
+		if seen[pvc.Name] {
+			continue
+		}
+		seen[pvc.Name] = true
+		volumes = append(volumes, corev1.Volume{
+			Name: pvc.Name,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.PVC,
+					ReadOnly:  pvc.ReadOnly,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      pvc.Name,
+			MountPath: pvc.MountPath,
+			ReadOnly:  pvc.ReadOnly,
+		})
+	}
+
 	var backoffLimit int32
 	var ttl int32 = 86400
 
@@ -127,27 +170,12 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 							Image:           r.image,
 							ImagePullPolicy: r.imagePullPolicy,
 							Command:         []string{"markov"},
-							Args:    args,
-							EnvFrom: envFrom,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "workflow",
-									MountPath: "/etc/markov",
-									ReadOnly:  true,
-								},
-							},
+							Args:            args,
+							EnvFrom:         envFrom,
+							VolumeMounts:    volumeMounts,
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "workflow",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-								},
-							},
-						},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
@@ -177,6 +205,21 @@ func (r *KubernetesRunner) Cancel(runID string) error {
 	_ = r.client.CoreV1().ConfigMaps(r.namespace).Delete(ctx, cmName, metav1.DeleteOptions{})
 
 	return nil
+}
+
+func (r *KubernetesRunner) ListPVCs(ctx context.Context) ([]PVCInfo, error) {
+	list, err := r.client.CoreV1().PersistentVolumeClaims(r.namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing PVCs: %w", err)
+	}
+	var pvcs []PVCInfo
+	for _, pvc := range list.Items {
+		pvcs = append(pvcs, PVCInfo{
+			Name:   pvc.Name,
+			Status: string(pvc.Status.Phase),
+		})
+	}
+	return pvcs, nil
 }
 
 func generateRunID() string {

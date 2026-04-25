@@ -64,6 +64,8 @@ func (s *Server) Router() http.Handler {
 			r.Post("/runs/{runID}/cancel", s.handleCancelRun)
 			r.Delete("/runs/{runID}", s.handleDeleteRun)
 
+			r.Get("/pvcs", s.handleListPVCs)
+
 			r.Get("/workflows", s.handleListWorkflows)
 			r.Get("/workflows/{name}", s.handleGetWorkflow)
 			r.Post("/workflows", s.handleCreateWorkflow)
