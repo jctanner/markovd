@@ -133,11 +133,6 @@ function iconSvg(name: string) {
 
 const nodeTypes = { step: StepNode };
 
-interface ForkGroup {
-  forkId: string;
-  steps: Step[];
-}
-
 function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]; stepMap: Map<string, Step> } {
   if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map() };
 
@@ -149,197 +144,153 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
     groups.get(fid)!.push(step);
   }
 
-  const mainSteps = groups.get('') || [];
-  groups.delete('');
-
-  // Collect unique fork prefixes that represent direct sub-workflows of main
-  // e.g. "deploy_all-0", "deploy_all-1" are direct forks; "deploy_all-0-health_check" is nested
-  const forkGroups: ForkGroup[] = [];
-  const sortedForks = Array.from(groups.keys()).sort();
-  for (const fid of sortedForks) {
-    forkGroups.push({ forkId: fid, steps: groups.get(fid)! });
-  }
-
   const nodes: Node<StepNodeData>[] = [];
   const edges: Edge[] = [];
 
-  // Track Y positions for layout
-  let globalY = START_Y;
-
-  // Build main chain
-  const mainNodeIds: string[] = [];
-  // Track which main steps have forks branching off
-  const mainStepForks = new Map<string, ForkGroup[]>();
-
-  for (const fg of forkGroups) {
-    // Direct fork: fork_id like "deploy_all-0" has parent in main
-    const fid = fg.forkId;
-    const dashIdx = fid.indexOf('-');
-    if (dashIdx === -1) continue;
-    // Check if this is a top-level fork (no parent fork in our groups)
-    const parentFork = fid.substring(0, fid.lastIndexOf('-'));
-    const lastSeg = fid.substring(fid.lastIndexOf('-') + 1);
-    if (/^\d+$/.test(lastSeg) && !groups.has(parentFork) && parentFork.indexOf('-') === -1) {
-      // Top-level for_each fork: parent step name is the part before the index
-      const stepName = parentFork;
-      if (!mainStepForks.has(stepName)) mainStepForks.set(stepName, []);
-      mainStepForks.get(stepName)!.push(fg);
-    }
+  interface ChainEntry {
+    step: Step;
+    path: string;
+    forkPrefix: string;
   }
 
-  // Place main steps
-  for (let i = 0; i < mainSteps.length; i++) {
-    const step = mainSteps[i];
-    const nodeId = `main::${step.step_name}`;
-    stepMap.set(nodeId, step);
-    nodes.push({
-      id: nodeId,
-      type: 'step',
-      position: { x: START_X, y: globalY },
-      data: {
-        label: step.step_name,
-        stepType: step.step_type || '',
-        status: step.status,
-        duration: duration(step.started_at, step.completed_at),
-        error: step.error || '',
-        forkId: '',
-        workflowName: step.workflow_name,
-        outputJson: step.output_json || '',
-      },
-      draggable: false,
-    });
-    mainNodeIds.push(nodeId);
-    globalY += NODE_H + NODE_GAP_Y;
-
-    // If this step has forks, place them
-    const forks = mainStepForks.get(step.step_name);
-    if (forks && forks.length > 0) {
-      const forkStartY = globalY;
-      const totalWidth = (forks.length - 1) * FORK_GAP_X;
-      const startX = START_X - totalWidth / 2;
-
-      let maxForkEndY = globalY;
-
-      for (let fi = 0; fi < forks.length; fi++) {
-        const fg = forks[fi];
-        const forkX = startX + fi * FORK_GAP_X;
-        let forkY = forkStartY;
-
-        // Collect nested steps for this fork: any fork_id that starts with this fork's id
-        const nestedSteps: Step[] = [...fg.steps];
-        const nestedForks: ForkGroup[] = [];
-        for (const ofg of forkGroups) {
-          if (ofg.forkId !== fg.forkId && ofg.forkId.startsWith(fg.forkId + '-')) {
-            nestedForks.push(ofg);
-          }
-        }
-
-        // Build nodes for this fork's direct steps
-        const forkNodeIds: string[] = [];
-        // Track which steps in this fork have nested sub-workflows
-        const subForkMap = new Map<string, ForkGroup[]>();
-        for (const nfg of nestedForks) {
-          const suffix = nfg.forkId.substring(fg.forkId.length + 1);
-          // Direct child: suffix has no more dashes, or suffix is "stepname" without index
-          const subDash = suffix.indexOf('-');
-          if (subDash === -1) {
-            // Direct sub-workflow (no index), e.g. health_check
-            if (!subForkMap.has(suffix)) subForkMap.set(suffix, []);
-            subForkMap.get(suffix)!.push(nfg);
-          }
-        }
-
-        for (let si = 0; si < nestedSteps.length; si++) {
-          const step = nestedSteps[si];
-          const nodeId = `${fg.forkId}::${step.step_name}`;
-          stepMap.set(nodeId, step);
-          nodes.push({
-            id: nodeId,
-            type: 'step',
-            position: { x: forkX, y: forkY },
-            data: {
-              label: step.step_name,
-              stepType: step.step_type || '',
-              status: step.status,
-              duration: duration(step.started_at, step.completed_at),
-              error: step.error || '',
-              forkId: fg.forkId,
-              workflowName: step.workflow_name,
-              outputJson: step.output_json || '',
-            },
-            draggable: false,
-          });
-          forkNodeIds.push(nodeId);
-          forkY += NODE_H + NODE_GAP_Y;
-        }
-
-        // Connect fork steps sequentially
-        for (let si = 0; si < forkNodeIds.length - 1; si++) {
-          const isRunning = nestedSteps[si + 1]?.status === 'running';
-          edges.push({
-            id: `${forkNodeIds[si]}->${forkNodeIds[si + 1]}`,
-            source: forkNodeIds[si],
-            target: forkNodeIds[si + 1],
-            type: 'smoothstep',
-            animated: isRunning,
-            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
-            style: { stroke: isRunning ? 'var(--status-running)' : 'var(--border-hover)', strokeWidth: 1.5 },
-          });
-        }
-
-        // Edge from parent main step to first fork node
-        if (forkNodeIds.length > 0) {
-          edges.push({
-            id: `${nodeId}-fork->${forkNodeIds[0]}`,
-            source: nodeId,
-            target: forkNodeIds[0],
-            type: 'smoothstep',
-            animated: nestedSteps[0]?.status === 'running',
-            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
-            style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
-          });
-        }
-
-        // Edge from last fork node back to next main step
-        if (forkNodeIds.length > 0 && i + 1 < mainSteps.length) {
-          const nextMainId = `main::${mainSteps[i + 1].step_name}`;
-          edges.push({
-            id: `${forkNodeIds[forkNodeIds.length - 1]}-join->${nextMainId}`,
-            source: forkNodeIds[forkNodeIds.length - 1],
-            target: nextMainId,
-            type: 'smoothstep',
-            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
-            style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
-          });
-        }
-
-        maxForkEndY = Math.max(maxForkEndY, forkY);
+  function expandChain(path: string): ChainEntry[] {
+    const stepsAtPath = groups.get(path) || [];
+    const chain: ChainEntry[] = [];
+    for (const step of stepsAtPath) {
+      const forkPrefix = path ? `${path}-${step.step_name}` : step.step_name;
+      chain.push({ step, path, forkPrefix });
+      if (groups.has(forkPrefix)) {
+        chain.push(...expandChain(forkPrefix));
       }
-
-      globalY = maxForkEndY;
     }
+    return chain;
   }
 
-  // Connect main steps sequentially (skip connections where forks already join)
-  for (let i = 0; i < mainNodeIds.length - 1; i++) {
-    const stepName = mainSteps[i].step_name;
-    if (mainStepForks.has(stepName)) continue; // fork edges handle this connection
-
-    const isRunning = mainSteps[i + 1].status === 'running';
-    edges.push({
-      id: `${mainNodeIds[i]}->${mainNodeIds[i + 1]}`,
-      source: mainNodeIds[i],
-      target: mainNodeIds[i + 1],
-      type: 'smoothstep',
-      animated: isRunning,
-      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-      style: { stroke: isRunning ? 'var(--status-running)' : 'var(--border-hover)', strokeWidth: 2 },
-    });
+  function findForEachForks(forkPrefix: string, chainPrefixes: string[]): string[] {
+    const prefix = forkPrefix + '-';
+    const candidates: string[] = [];
+    for (const fid of groups.keys()) {
+      if (!fid.startsWith(prefix)) continue;
+      const ownedByChild = chainPrefixes.some(cp => cp.length > forkPrefix.length && fid.startsWith(cp + '-'));
+      if (!ownedByChild) candidates.push(fid);
+    }
+    return candidates.filter(fid =>
+      !candidates.some(other => other !== fid && fid.startsWith(other + '-'))
+    );
   }
 
-  // Add remaining fork groups that aren't direct children of main (nested sub-workflows)
-  // These aren't laid out yet; place them as additional columns
-  // For now, nested sub-workflow steps are included inline in their parent fork
+  function forkDisplayKey(forkId: string, forkPrefix: string): string {
+    return forkId.substring(forkPrefix.length + 1);
+  }
+
+  function layoutChain(
+    chain: ChainEntry[],
+    x: number,
+    startY: number,
+    displayForkId: string,
+  ): { nodeIds: string[]; endY: number } {
+    const chainNodeIds: string[] = [];
+    const chainSteps: Step[] = [];
+    const chainForkIndices = new Map<number, string[]>();
+    let y = startY;
+
+    const chainPrefixes = chain.map(e => e.forkPrefix);
+    for (let i = 0; i < chain.length; i++) {
+      const forks = findForEachForks(chain[i].forkPrefix, chainPrefixes);
+      if (forks.length > 0) chainForkIndices.set(i, forks);
+    }
+
+    for (let i = 0; i < chain.length; i++) {
+      const { step, path, forkPrefix } = chain[i];
+      const nodeId = `${displayForkId || 'main'}::${path}::${step.step_name}`;
+      stepMap.set(nodeId, step);
+      nodes.push({
+        id: nodeId,
+        type: 'step',
+        position: { x, y },
+        data: {
+          label: step.step_name,
+          stepType: step.step_type || '',
+          status: step.status,
+          duration: duration(step.started_at, step.completed_at),
+          error: step.error || '',
+          forkId: displayForkId,
+          workflowName: step.workflow_name,
+          outputJson: step.output_json || '',
+        },
+        draggable: false,
+      });
+      chainNodeIds.push(nodeId);
+      chainSteps.push(step);
+      y += NODE_H + NODE_GAP_Y;
+
+      const forkIds = chainForkIndices.get(i);
+      if (forkIds && forkIds.length > 0) {
+        const forkStartY = y;
+        const totalWidth = (forkIds.length - 1) * FORK_GAP_X;
+        const forkBaseX = x - totalWidth / 2;
+        let maxForkEndY = y;
+
+        for (let fi = 0; fi < forkIds.length; fi++) {
+          const forkId = forkIds[fi];
+          const forkX = forkBaseX + fi * FORK_GAP_X;
+          const forkKey = forkDisplayKey(forkId, forkPrefix);
+          const forkChain = expandChain(forkId);
+
+          const { nodeIds: fNodeIds, endY: fEndY } = layoutChain(
+            forkChain, forkX, forkStartY, forkKey,
+          );
+
+          if (fNodeIds.length > 0) {
+            edges.push({
+              id: `${nodeId}-fork->${fNodeIds[0]}`,
+              source: nodeId,
+              target: fNodeIds[0],
+              type: 'smoothstep',
+              animated: forkChain[0]?.step.status === 'running',
+              markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+              style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+            });
+
+            if (i + 1 < chain.length) {
+              const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
+              edges.push({
+                id: `${fNodeIds[fNodeIds.length - 1]}-join->${nextNodeId}`,
+                source: fNodeIds[fNodeIds.length - 1],
+                target: nextNodeId,
+                type: 'smoothstep',
+                markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+                style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+              });
+            }
+          }
+
+          maxForkEndY = Math.max(maxForkEndY, fEndY);
+        }
+
+        y = maxForkEndY;
+      }
+    }
+
+    for (let i = 0; i < chainNodeIds.length - 1; i++) {
+      if (chainForkIndices.has(i)) continue;
+      const isRunning = chainSteps[i + 1].status === 'running';
+      edges.push({
+        id: `${chainNodeIds[i]}->${chainNodeIds[i + 1]}`,
+        source: chainNodeIds[i],
+        target: chainNodeIds[i + 1],
+        type: 'smoothstep',
+        animated: isRunning,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+        style: { stroke: isRunning ? 'var(--status-running)' : 'var(--border-hover)', strokeWidth: 2 },
+      });
+    }
+
+    return { nodeIds: chainNodeIds, endY: y };
+  }
+
+  const mainChain = expandChain('');
+  layoutChain(mainChain, START_X, START_Y, '');
 
   return { nodes, edges, stepMap };
 }
