@@ -50,10 +50,10 @@ func generateMermaidFromYAML(yamlContent string) (string, error) {
 	renderWorkflow(&b, wfMap, entry, idGen, rendered, "")
 
 	b.WriteString("\n")
-	b.WriteString("    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f\n")
-	b.WriteString("    classDef foreach fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f\n")
-	b.WriteString("    classDef subwf fill:#ede9fe,stroke:#7c3aed,color:#3b1f6e\n")
-	b.WriteString("    classDef conditional fill:#fce7f3,stroke:#db2777,color:#831843,stroke-dasharray:5 5\n")
+	b.WriteString("    classDef gate fill:#fef3c7,stroke:#d97706\n")
+	b.WriteString("    classDef foreach fill:#dbeafe,stroke:#3b82f6\n")
+	b.WriteString("    classDef subwf fill:#ede9fe,stroke:#7c3aed\n")
+	b.WriteString("    classDef conditional fill:#fce7f3,stroke:#db2777,stroke-dasharray:5 5\n")
 
 	return b.String(), nil
 }

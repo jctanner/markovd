@@ -1577,6 +1577,20 @@ td.cell-link a:hover {
   height: auto;
 }
 
+.mermaid-diagram .node.gate .nodeLabel,
+.mermaid-diagram .node.foreach .nodeLabel,
+.mermaid-diagram .node.subwf .nodeLabel,
+.mermaid-diagram .node.conditional .nodeLabel {
+  color: #1e293b !important;
+}
+
+.mermaid-diagram .node.gate text,
+.mermaid-diagram .node.foreach text,
+.mermaid-diagram .node.subwf text,
+.mermaid-diagram .node.conditional text {
+  fill: #1e293b !important;
+}
+
 /* ===== RESPONSIVE ===== */
 
 @media (max-width: 768px) {
