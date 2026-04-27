@@ -98,6 +98,27 @@ func (s *Server) handleUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, wf)
 }
 
+func (s *Server) handleWorkflowDiagram(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	wf, err := s.db.GetWorkflowByName(r.Context(), name)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get workflow"})
+		return
+	}
+	if wf == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "workflow not found"})
+		return
+	}
+
+	mermaid, err := generateMermaidFromYAML(wf.YAML)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to generate diagram"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"mermaid": mermaid})
+}
+
 func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 

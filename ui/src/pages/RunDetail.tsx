@@ -7,6 +7,7 @@ import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
 import RerunModal from '../components/RerunModal';
+import MermaidDiagram from '../components/MermaidDiagram';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -52,6 +53,8 @@ export default function RunDetail() {
   const [view, setView] = useState<ViewMode>('graph');
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
+  const [diagram, setDiagram] = useState('');
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleRef = useRef(true);
   const runRef = useRef<RunDetailType | null>(null);
@@ -127,6 +130,13 @@ export default function RunDetail() {
     document.addEventListener('visibilitychange', onVisChange);
     return () => document.removeEventListener('visibilitychange', onVisChange);
   }, [loadRun]);
+
+  useEffect(() => {
+    if (!run?.workflow_name) return;
+    api.getWorkflowDiagram(run.workflow_name)
+      .then((d) => setDiagram(d.mermaid))
+      .catch(() => setDiagram(''));
+  }, [run?.workflow_name]);
 
   const handleCancel = async () => {
     if (!runID) return;
@@ -245,6 +255,23 @@ export default function RunDetail() {
           );
         } catch { return null; }
       })()}
+
+      {diagram && (
+        <div style={{ marginBottom: 20 }}>
+          <button
+            className="diagram-toggle"
+            onClick={() => setDiagramOpen(!diagramOpen)}
+          >
+            <span className="diagram-toggle-chevron">{diagramOpen ? '▾' : '▸'}</span>
+            Workflow Diagram
+          </button>
+          {diagramOpen && (
+            <div className="diagram-container">
+              <MermaidDiagram code={diagram} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div className="section-heading" style={{ margin: 0, flex: 1 }}>Steps</div>

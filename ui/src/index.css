@@ -1530,6 +1530,53 @@ td.cell-link a:hover {
   color: var(--text-muted);
 }
 
+/* ===== MERMAID DIAGRAM ===== */
+
+.diagram-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 4px 0;
+  transition: color var(--ease-fast);
+}
+
+.diagram-toggle:hover {
+  color: var(--text-primary);
+}
+
+.diagram-toggle-chevron {
+  font-size: 10px;
+  width: 12px;
+}
+
+.diagram-container {
+  margin-top: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  overflow: auto;
+}
+
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ===== RESPONSIVE ===== */
 
 @media (max-width: 768px) {

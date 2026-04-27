@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { api } from '../api';
 import type { Workflow } from '../api';
+import MermaidDiagram from '../components/MermaidDiagram';
 
 export default function Workflows() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -12,6 +13,8 @@ export default function Workflows() {
   const [selected, setSelected] = useState<Workflow | null>(null);
   const [editing, setEditing] = useState(false);
   const [editYaml, setEditYaml] = useState('');
+  const [diagram, setDiagram] = useState('');
+  const [diagramOpen, setDiagramOpen] = useState(true);
 
   const loadWorkflows = async () => {
     try {
@@ -22,6 +25,13 @@ export default function Workflows() {
   };
 
   useEffect(() => { loadWorkflows(); }, []);
+
+  useEffect(() => {
+    if (!selected) { setDiagram(''); return; }
+    api.getWorkflowDiagram(selected.name)
+      .then((d) => setDiagram(d.mermaid))
+      .catch(() => setDiagram(''));
+  }, [selected?.name]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -158,6 +168,23 @@ export default function Workflows() {
                 </div>
               )}
               <pre className="yaml-viewer">{selected.yaml}</pre>
+
+              {diagram && (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    className="diagram-toggle"
+                    onClick={() => setDiagramOpen(!diagramOpen)}
+                  >
+                    <span className="diagram-toggle-chevron">{diagramOpen ? '▾' : '▸'}</span>
+                    Diagram
+                  </button>
+                  {diagramOpen && (
+                    <div className="diagram-container">
+                      <MermaidDiagram code={diagram} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -75,6 +75,7 @@ func (s *Server) Router() http.Handler {
 
 			r.Get("/workflows", s.handleListWorkflows)
 			r.Get("/workflows/{name}", s.handleGetWorkflow)
+			r.Get("/workflows/{name}/diagram", s.handleWorkflowDiagram)
 			r.Post("/workflows", s.handleCreateWorkflow)
 			r.Put("/workflows/{name}", s.handleUpdateWorkflow)
 			r.Delete("/workflows/{name}", s.handleDeleteWorkflow)

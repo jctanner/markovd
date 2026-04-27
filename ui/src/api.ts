@@ -183,6 +183,10 @@ export const api = {
     return request<Workflow>(`/workflows/${name}`);
   },
 
+  getWorkflowDiagram(name: string) {
+    return request<{ mermaid: string }>(`/workflows/${name}/diagram`);
+  },
+
   cancelRun(runID: string) {
     return request<Run>(`/runs/${runID}/cancel`, { method: 'POST' });
   },
