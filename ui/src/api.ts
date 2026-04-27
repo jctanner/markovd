@@ -89,6 +89,7 @@ export interface Step {
   error: string;
   started_at: string | null;
   completed_at: string | null;
+  updated_at: string | null;
 }
 
 export interface RunDetail extends Run {
@@ -159,8 +160,9 @@ export const api = {
     return request<Run[]>('/runs');
   },
 
-  getRun(runID: string) {
-    return request<RunDetail>(`/runs/${runID}`);
+  getRun(runID: string, since?: string) {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    return request<RunDetail>(`/runs/${runID}${qs}`);
   },
 
   createRun(workflowName: string, vars: Record<string, string>, debug = false, volumes: { name: string; pvc: string; mount_path: string }[] = [], secretVolumes: { name: string; secret: string; mount_path: string }[] = []) {

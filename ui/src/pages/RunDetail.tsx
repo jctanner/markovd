@@ -19,21 +19,27 @@ function badgeClass(status: string): string {
   return `badge ${map[status] || 'badge-pending'}`;
 }
 
-function stepsFingerprint(steps: Step[]): string {
-  let hash = steps.length;
-  for (const s of steps) {
-    hash = (hash * 31 + s.id) | 0;
-    hash = (hash * 31 + s.status.charCodeAt(0)) | 0;
-  }
-  return `${steps.length}:${hash}`;
-}
-
 function pollInterval(stepCount: number, status: string): number {
   if (status === 'completed' || status === 'failed' || status === 'cancelled') return 30000;
   if (stepCount > 5000) return 30000;
   if (stepCount > 1000) return 15000;
   if (stepCount > 500) return 10000;
   return 3000;
+}
+
+function maxUpdatedAt(steps: Step[]): string | null {
+  let max: string | null = null;
+  for (const s of steps) {
+    if (s.updated_at && (!max || s.updated_at > max)) max = s.updated_at;
+  }
+  return max;
+}
+
+function mergeSteps(existing: Step[], delta: Step[]): Step[] {
+  const map = new Map<number, Step>();
+  for (const s of existing) map.set(s.id, s);
+  for (const s of delta) map.set(s.id, s);
+  return [...map.values()].sort((a, b) => a.id - b.id);
 }
 
 type ViewMode = 'graph' | 'gantt' | 'table';
@@ -46,30 +52,45 @@ export default function RunDetail() {
   const [view, setView] = useState<ViewMode>('graph');
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
-  const fingerprintRef = useRef('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleRef = useRef(true);
   const runRef = useRef<RunDetailType | null>(null);
+  const sinceRef = useRef<string | null>(null);
+  const initialLoadDone = useRef(false);
 
   const loadRun = useCallback(async () => {
     if (!runID) return;
     try {
-      const data = await api.getRun(runID);
-      const fp = stepsFingerprint(data.steps);
-      if (fp !== fingerprintRef.current) {
-        fingerprintRef.current = fp;
+      const since = initialLoadDone.current ? sinceRef.current ?? undefined : undefined;
+      const data = await api.getRun(runID, since);
+
+      if (!initialLoadDone.current || !since) {
+        initialLoadDone.current = true;
+        sinceRef.current = maxUpdatedAt(data.steps);
         runRef.current = data;
         setRun(data);
       } else {
-        setRun(prev => {
-          if (!prev) { runRef.current = data; return data; }
-          if (prev.status !== data.status || prev.completed_at !== data.completed_at) {
-            const updated = { ...data, steps: prev.steps };
+        if (data.steps.length === 0) {
+          setRun(prev => {
+            if (!prev) return data;
+            if (prev.status !== data.status || prev.completed_at !== data.completed_at) {
+              const updated = { ...data, steps: prev.steps };
+              runRef.current = updated;
+              return updated;
+            }
+            return prev;
+          });
+        } else {
+          const deltaMax = maxUpdatedAt(data.steps);
+          if (deltaMax) sinceRef.current = deltaMax;
+          setRun(prev => {
+            if (!prev) { runRef.current = data; return data; }
+            const merged = mergeSteps(prev.steps, data.steps);
+            const updated = { ...data, steps: merged };
             runRef.current = updated;
             return updated;
-          }
-          return prev;
-        });
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load run');
@@ -89,7 +110,8 @@ export default function RunDetail() {
   }, [loadRun]);
 
   useEffect(() => {
-    fingerprintRef.current = '';
+    initialLoadDone.current = false;
+    sinceRef.current = null;
     runRef.current = null;
     loadRun().then(() => scheduleNext());
     return () => {

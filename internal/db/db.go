@@ -125,6 +125,13 @@ func (d *DB) migrate() error {
 				ALTER TABLE runs ADD COLUMN secret_volumes_json TEXT DEFAULT '[]';
 			END IF;
 		END $$`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='steps' AND column_name='updated_at') THEN
+				ALTER TABLE steps ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+				UPDATE steps SET updated_at = COALESCE(completed_at, started_at, now());
+				CREATE INDEX idx_steps_run_updated ON steps(run_id, updated_at);
+			END IF;
+		END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

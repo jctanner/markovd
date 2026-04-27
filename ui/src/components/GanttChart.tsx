@@ -66,9 +66,6 @@ function detectForkGroups(steps: Step[]): Map<string, string[]> {
       if (fid.startsWith(prefix)) {
         const remainder = fid.substring(prefix.length);
         const nextDash = remainder.indexOf('-');
-        const topLevel = nextDash === -1 ? fid : name + '-' + remainder;
-        const branchRoot = nextDash === -1 ? fid : fid;
-
         if (!groups.has(name)) groups.set(name, new Set());
 
         const rootFid = nextDash === -1 ? fid : findBranchRoot(fid, name);
@@ -146,7 +143,7 @@ function buildDisplayRows(
   allRows: GanttRow[],
   forkGroups: Map<string, string[]>,
   expanded: Set<string>,
-  t0Offset: number,
+  _t0Offset: number,
 ): DisplayRow[] {
   if (forkGroups.size === 0) return allRows;
 

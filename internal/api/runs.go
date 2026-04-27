@@ -77,7 +77,17 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	steps, err := s.db.GetStepsByRunID(r.Context(), runID)
+	var steps []models.Step
+	if sinceStr := r.URL.Query().Get("since"); sinceStr != "" {
+		since, parseErr := time.Parse(time.RFC3339Nano, sinceStr)
+		if parseErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid since parameter, expected RFC3339"})
+			return
+		}
+		steps, err = s.db.GetStepsUpdatedSince(r.Context(), runID, since)
+	} else {
+		steps, err = s.db.GetStepsByRunID(r.Context(), runID)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get steps"})
 		return
