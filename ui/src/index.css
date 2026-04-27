@@ -741,7 +741,7 @@ td.cell-link a:hover {
   background: var(--border);
 }
 
-/* ===== WORKFLOWS ===== */
+/* ===== LAYOUTS ===== */
 
 .split-layout {
   display: grid;
@@ -750,16 +750,22 @@ td.cell-link a:hover {
   align-items: start;
 }
 
+/* ===== WORKFLOWS ===== */
+
 .wf-row {
   cursor: pointer;
 }
 
-.wf-row.selected {
-  background: var(--accent-subtle) !important;
+.wf-detail-modal {
+  width: 95vw;
+  max-width: 1000px;
+  max-height: 90vh;
 }
 
-.wf-row.selected td {
-  color: var(--text-primary);
+.wf-upload-modal {
+  width: 90vw;
+  max-width: 560px;
+  max-height: 85vh;
 }
 
 .yaml-viewer {
