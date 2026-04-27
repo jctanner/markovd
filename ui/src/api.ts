@@ -116,6 +116,41 @@ export interface UserPreferences {
   default_secrets: VolumeDefault[];
 }
 
+export interface DiagramNodeData {
+  label: string;
+  stepType: string;
+  category: string;
+  forEach?: string;
+  subWorkflow?: string;
+  when?: string;
+  rules?: string[];
+  workflowGroup: string;
+}
+
+export interface DiagramNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: DiagramNodeData;
+  parentId?: string;
+  extent?: string;
+  style?: Record<string, number | string>;
+}
+
+export interface DiagramEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  animated: boolean;
+  style?: Record<string, string | number>;
+}
+
+export interface DiagramResponse {
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+}
+
 export const api = {
   login(username: string, password: string) {
     return request<{ token: string }>('/auth/login', {
@@ -184,7 +219,7 @@ export const api = {
   },
 
   getWorkflowDiagram(name: string) {
-    return request<{ mermaid: string }>(`/workflows/${name}/diagram`);
+    return request<DiagramResponse>(`/workflows/${name}/diagram`);
   },
 
   cancelRun(runID: string) {

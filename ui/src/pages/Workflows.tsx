@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Workflow } from '../api';
-import MermaidDiagram from '../components/MermaidDiagram';
 
 export default function Workflows() {
+  const navigate = useNavigate();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [selected, setSelected] = useState<Workflow | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [editYaml, setEditYaml] = useState('');
-  const [diagram, setDiagram] = useState('');
-  const [diagramOpen, setDiagramOpen] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
 
   const loadWorkflows = async () => {
@@ -26,13 +22,6 @@ export default function Workflows() {
   };
 
   useEffect(() => { loadWorkflows(); }, []);
-
-  useEffect(() => {
-    if (!selected) { setDiagram(''); return; }
-    api.getWorkflowDiagram(selected.name)
-      .then((d) => setDiagram(d.mermaid))
-      .catch(() => setDiagram(''));
-  }, [selected?.name]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,42 +44,9 @@ export default function Workflows() {
     setError('');
     try {
       await api.deleteWorkflow(wf.name);
-      if (selected?.id === wf.id) {
-        setSelected(null);
-        setEditing(false);
-      }
       await loadWorkflows();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete workflow');
-    }
-  };
-
-  const openDetail = (wf: Workflow) => {
-    setSelected(wf);
-    setEditing(false);
-    setDiagramOpen(true);
-  };
-
-  const startEdit = (wf?: Workflow) => {
-    const target = wf || selected;
-    if (!target || target.project_id) return;
-    setEditYaml(target.yaml);
-    setEditing(true);
-    setError('');
-    setSuccess('');
-  };
-
-  const saveEdit = async () => {
-    if (!selected) return;
-    setError('');
-    try {
-      const updated = await api.updateWorkflow(selected.name, editYaml);
-      setSelected(updated);
-      setEditing(false);
-      setSuccess(`Workflow "${selected.name}" updated.`);
-      await loadWorkflows();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update workflow');
     }
   };
 
@@ -103,8 +59,8 @@ export default function Workflows() {
         </button>
       </div>
 
-      {error && !showUpload && !selected && <div className="msg-error">{error}</div>}
-      {success && !showUpload && !selected && <div className="msg-success">{success}</div>}
+      {error && !showUpload && <div className="msg-error">{error}</div>}
+      {success && !showUpload && <div className="msg-success">{success}</div>}
 
       <div className="table-wrap">
         <table>
@@ -121,7 +77,7 @@ export default function Workflows() {
               <tr
                 key={wf.id}
                 className="wf-row"
-                onClick={() => openDetail(wf)}
+                onClick={() => navigate(`/workflows/${encodeURIComponent(wf.name)}`)}
               >
                 <td className="cell-mono">{wf.name}</td>
                 <td>
@@ -134,15 +90,6 @@ export default function Workflows() {
                   {new Date(wf.updated_at).toLocaleString()}
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  {!wf.project_id && (
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => { openDetail(wf); startEdit(wf); }}
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {' '}
                   <button
                     className="btn btn-sm btn-danger"
                     onClick={() => handleDelete(wf)}
@@ -163,68 +110,6 @@ export default function Workflows() {
         </table>
       </div>
 
-      {/* Workflow detail modal */}
-      {selected && (
-        <div className="modal-backdrop" onClick={() => { setSelected(null); setEditing(false); }}>
-          <div className="modal-card wf-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <span className="modal-title">{selected.name}</span>
-                {selected.source_path && (
-                  <span className="modal-job-name">Source: {selected.source_path}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {!selected.project_id && !editing && (
-                  <button className="btn btn-sm btn-ghost" onClick={startEdit}>Edit</button>
-                )}
-                <button className="modal-close" onClick={() => { setSelected(null); setEditing(false); }}>&times;</button>
-              </div>
-            </div>
-            <div className="modal-body">
-              {error && <div className="msg-error">{error}</div>}
-              {success && <div className="msg-success">{success}</div>}
-
-              {!editing ? (
-                <>
-                  <pre className="yaml-viewer">{selected.yaml}</pre>
-                  {diagram && (
-                    <div style={{ marginTop: 16 }}>
-                      <button
-                        className="diagram-toggle"
-                        onClick={() => setDiagramOpen(!diagramOpen)}
-                      >
-                        <span className="diagram-toggle-chevron">{diagramOpen ? '▾' : '▸'}</span>
-                        Diagram
-                      </button>
-                      {diagramOpen && (
-                        <div className="diagram-container">
-                          <MermaidDiagram code={diagram} />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <textarea
-                    className="form-textarea"
-                    value={editYaml}
-                    onChange={(e) => setEditYaml(e.target.value)}
-                    rows={20}
-                  />
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                    <button className="btn btn-primary btn-sm" onClick={saveEdit}>Save</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Cancel</button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Upload workflow modal */}
       {showUpload && (
         <div className="modal-backdrop" onClick={() => setShowUpload(false)}>
           <div className="modal-card wf-upload-modal" onClick={(e) => e.stopPropagation()}>

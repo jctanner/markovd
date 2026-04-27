@@ -7,7 +7,8 @@ import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
 import RerunModal from '../components/RerunModal';
-import MermaidDiagram from '../components/MermaidDiagram';
+import WorkflowStructureGraph from '../components/WorkflowStructureGraph';
+import type { DiagramResponse } from '../api';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -53,7 +54,7 @@ export default function RunDetail() {
   const [view, setView] = useState<ViewMode>('graph');
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
-  const [diagram, setDiagram] = useState('');
+  const [diagram, setDiagram] = useState<DiagramResponse | null>(null);
   const [diagramOpen, setDiagramOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleRef = useRef(true);
@@ -134,8 +135,8 @@ export default function RunDetail() {
   useEffect(() => {
     if (!run?.workflow_name) return;
     api.getWorkflowDiagram(run.workflow_name)
-      .then((d) => setDiagram(d.mermaid))
-      .catch(() => setDiagram(''));
+      .then((d) => setDiagram(d))
+      .catch(() => setDiagram(null));
   }, [run?.workflow_name]);
 
   const handleCancel = async () => {
@@ -256,7 +257,7 @@ export default function RunDetail() {
         } catch { return null; }
       })()}
 
-      {diagram && (
+      {diagram && diagram.nodes.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <button
             className="diagram-toggle"
@@ -266,9 +267,7 @@ export default function RunDetail() {
             Workflow Diagram
           </button>
           {diagramOpen && (
-            <div className="diagram-container">
-              <MermaidDiagram code={diagram} />
-            </div>
+            <WorkflowStructureGraph nodes={diagram.nodes} edges={diagram.edges} />
           )}
         </div>
       )}

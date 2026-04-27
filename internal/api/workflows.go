@@ -110,13 +110,13 @@ func (s *Server) handleWorkflowDiagram(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mermaid, err := generateMermaidFromYAML(wf.YAML)
+	diagram, err := generateDiagramFromYAML(wf.YAML)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to generate diagram"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"mermaid": mermaid})
+	writeJSON(w, http.StatusOK, diagram)
 }
 
 func (s *Server) handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
