@@ -4,9 +4,11 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   Handle,
   Position,
   MarkerType,
+  useReactFlow,
 } from '@xyflow/react';
 import type { Node, Edge, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -188,9 +190,41 @@ function iconSvg(name: string) {
       return <svg {...props}><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
     case 'shrink':
       return <svg {...props}><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
+    case 'arrow-down':
+      return <svg {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>;
     default:
       return <svg {...props}><circle cx="12" cy="12" r="4" /></svg>;
   }
+}
+
+function miniMapColor(node: Node): string {
+  const d = node.data as Record<string, unknown>;
+  const status = (d.status as string) || '';
+  const map: Record<string, string> = {
+    running: 'var(--status-running)',
+    completed: 'var(--status-completed)',
+    failed: 'var(--status-failed)',
+    skipped: 'var(--status-skipped)',
+  };
+  return map[status] || 'var(--border-hover)';
+}
+
+function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
+  const { setCenter } = useReactFlow();
+  const jump = useCallback(() => {
+    if (nodes.length === 0) return;
+    let bottom = nodes[0];
+    for (const n of nodes) {
+      if (n.position.y > bottom.position.y) bottom = n;
+    }
+    setCenter(bottom.position.x + 130, bottom.position.y + 36, { zoom: 1, duration: 400 });
+  }, [nodes, setCenter]);
+
+  return (
+    <button className="graph-jump-btn" onClick={jump} title="Jump to bottom">
+      {iconSvg('arrow-down')}
+    </button>
+  );
 }
 
 const nodeTypes = { step: StepNode, forkSummary: ForkSummaryNode };
@@ -700,6 +734,13 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
           <Controls showInteractive={false} />
+          <MiniMap
+            nodeColor={miniMapColor}
+            maskColor="rgba(0, 0, 0, 0.35)"
+            pannable
+            zoomable
+          />
+          <JumpToBottomButton nodes={nodes} />
         </ReactFlow>
       </div>
       <ForkDetailModal

@@ -1169,6 +1169,45 @@ td.cell-link a:hover {
   gap: 3px;
 }
 
+/* ── Jump to bottom button ── */
+
+.graph-jump-btn {
+  position: absolute;
+  top: 10px;
+  right: 48px;
+  z-index: 10;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease-fast);
+}
+
+.graph-jump-btn:hover {
+  color: var(--accent);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+
+/* ── MiniMap ── */
+
+.graph-container .react-flow__minimap {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+[data-theme="light"] .graph-container .react-flow__minimap {
+  background: var(--bg-surface);
+}
+
 /* ── Fullscreen toggle ── */
 
 .graph-container {
