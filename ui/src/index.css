@@ -1113,6 +1113,186 @@ td.cell-link a:hover {
   background: var(--accent-subtle);
 }
 
+/* ── Graph summary (collapsed fork) nodes ── */
+
+.graph-summary-node {
+  width: 260px;
+  padding: 12px 16px;
+}
+
+.graph-summary-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-summary-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.graph-summary-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-root);
+  margin-bottom: 6px;
+}
+
+.graph-summary-seg {
+  height: 100%;
+  transition: width var(--ease);
+}
+
+.graph-summary-seg-completed { background: var(--status-completed); }
+.graph-summary-seg-running   { background: var(--status-running); }
+.graph-summary-seg-failed    { background: var(--status-failed); }
+.graph-summary-seg-skipped   { background: var(--status-skipped); }
+
+.graph-summary-legend {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.graph-summary-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Fullscreen toggle ── */
+
+.graph-container {
+  position: relative;
+}
+
+.graph-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  border-radius: 0;
+  margin: 0;
+  height: 100vh !important;
+}
+
+.graph-fullscreen-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease-fast);
+}
+
+.graph-fullscreen-btn:hover {
+  color: var(--accent);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+
+/* ── Fork detail modal ── */
+
+.fork-modal-card {
+  width: 95vw;
+  max-width: 1100px;
+  max-height: 85vh;
+}
+
+.fork-modal-branch-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.fork-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fork-modal-th {
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  user-select: none;
+}
+
+.fork-modal-row {
+  cursor: pointer;
+  transition: background var(--ease-fast);
+}
+
+.fork-modal-row:hover {
+  background: var(--bg-hover);
+}
+
+.fork-modal-row-expanded {
+  background: var(--accent-subtle) !important;
+}
+
+.fork-modal-row-running { border-left: 3px solid var(--status-running); }
+.fork-modal-row-failed  { border-left: 3px solid var(--status-failed); }
+.fork-modal-row-completed { border-left: 3px solid var(--status-completed); }
+
+.fork-modal-td {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fork-modal-detail-row td {
+  padding: 0;
+}
+
+.fork-modal-detail-cell {
+  padding: 8px 16px 12px !important;
+  background: var(--bg-root);
+}
+
+.fork-modal-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fork-modal-step-row {
+  cursor: pointer;
+  transition: background var(--ease-fast);
+}
+
+.fork-modal-step-row:hover {
+  background: var(--bg-hover);
+}
+
+.fork-modal-step-row td {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 /* Light theme overrides for graph */
 [data-theme="light"] .graph-node {
   background: var(--bg-surface);

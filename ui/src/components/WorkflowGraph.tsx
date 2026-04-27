@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,10 +13,12 @@ import '@xyflow/react/dist/style.css';
 import type { Step } from '../api';
 
 const NODE_H = 72;
+const SUMMARY_NODE_H = 96;
 const NODE_GAP_Y = 60;
 const FORK_GAP_X = 280;
 const START_Y = 40;
 const START_X = 0;
+const COLLAPSE_THRESHOLD = 5;
 
 type StepNodeData = {
   label: string;
@@ -27,6 +29,17 @@ type StepNodeData = {
   forkId: string;
   workflowName: string;
   outputJson: string;
+};
+
+type ForkSummaryData = {
+  stepName: string;
+  forkPrefix: string;
+  totalBranches: number;
+  completed: number;
+  running: number;
+  failed: number;
+  skipped: number;
+  pending: number;
 };
 
 const statusBorder: Record<string, string> = {
@@ -58,6 +71,16 @@ function duration(start: string | null, end: string | null): string {
   const ms = e - s;
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function durationLong(start: string | null, end: string | null): string {
+  if (!start) return '-';
+  const s = new Date(start).getTime();
+  const e = end ? new Date(end).getTime() : Date.now();
+  const ms = e - s;
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
 }
 
 function parseJobName(outputJson: string): string | null {
@@ -105,6 +128,41 @@ function StepNode({ data }: NodeProps<Node<StepNodeData>>) {
   );
 }
 
+function ForkSummaryNode({ data }: NodeProps<Node<ForkSummaryData>>) {
+  const total = data.totalBranches;
+  const pctComplete = total > 0 ? (data.completed / total) * 100 : 0;
+  const pctRunning = total > 0 ? (data.running / total) * 100 : 0;
+  const pctFailed = total > 0 ? (data.failed / total) * 100 : 0;
+  const pctSkipped = total > 0 ? (data.skipped / total) * 100 : 0;
+
+  const overallStatus = data.running > 0 ? 'running' : data.failed > 0 ? 'failed' : data.completed === total ? 'completed' : 'pending';
+  const border = statusBorder[overallStatus] || statusBorder.pending;
+
+  return (
+    <div
+      className={`graph-node graph-summary-node graph-node-${overallStatus}`}
+      style={{ borderLeftColor: border, cursor: 'pointer' }}
+    >
+      <Handle type="target" position={Position.Top} className="graph-handle" />
+      <div className="graph-summary-title">{data.stepName}</div>
+      <div className="graph-summary-count">{total} branches</div>
+      <div className="graph-summary-bar">
+        {pctComplete > 0 && <div className="graph-summary-seg graph-summary-seg-completed" style={{ width: `${pctComplete}%` }} />}
+        {pctRunning > 0 && <div className="graph-summary-seg graph-summary-seg-running" style={{ width: `${pctRunning}%` }} />}
+        {pctFailed > 0 && <div className="graph-summary-seg graph-summary-seg-failed" style={{ width: `${pctFailed}%` }} />}
+        {pctSkipped > 0 && <div className="graph-summary-seg graph-summary-seg-skipped" style={{ width: `${pctSkipped}%` }} />}
+      </div>
+      <div className="graph-summary-legend">
+        {data.completed > 0 && <span className="graph-summary-legend-item graph-node-status-completed">{data.completed}</span>}
+        {data.running > 0 && <span className="graph-summary-legend-item graph-node-status-running">{data.running}</span>}
+        {data.failed > 0 && <span className="graph-summary-legend-item graph-node-status-failed">{data.failed}</span>}
+        {data.skipped > 0 && <span className="graph-summary-legend-item graph-node-status-skipped">{data.skipped}</span>}
+      </div>
+      <Handle type="source" position={Position.Bottom} className="graph-handle" />
+    </div>
+  );
+}
+
 function iconSvg(name: string) {
   const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (name) {
@@ -126,15 +184,208 @@ function iconSvg(name: string) {
       return <svg {...props}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>;
     case 'save':
       return <svg {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>;
+    case 'expand':
+      return <svg {...props}><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
+    case 'shrink':
+      return <svg {...props}><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
     default:
       return <svg {...props}><circle cx="12" cy="12" r="4" /></svg>;
   }
 }
 
-const nodeTypes = { step: StepNode };
+const nodeTypes = { step: StepNode, forkSummary: ForkSummaryNode };
 
-function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]; stepMap: Map<string, Step> } {
-  if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map() };
+// ─── Branch status helpers ─────────────────────────────────────────
+
+interface BranchInfo {
+  key: string;
+  forkId: string;
+  status: string;
+  currentStep: string;
+  stepsCompleted: number;
+  stepsTotal: number;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+function deriveBranchStatus(branchSteps: Step[]): string {
+  if (branchSteps.some(s => s.status === 'running')) return 'running';
+  if (branchSteps.some(s => s.status === 'failed')) return 'failed';
+  if (branchSteps.length > 0 && branchSteps.every(s => s.status === 'completed' || s.status === 'skipped')) return 'completed';
+  return 'pending';
+}
+
+function buildBranchInfos(steps: Step[], forkPrefix: string, forkIds: string[]): BranchInfo[] {
+  const allSteps = steps.filter(s => {
+    const fid = s.fork_id || '';
+    return forkIds.some(fi => fid === fi || fid.startsWith(fi + '-'));
+  });
+
+  const byBranch = new Map<string, Step[]>();
+  for (const fid of forkIds) {
+    byBranch.set(fid, []);
+  }
+  for (const step of allSteps) {
+    const fid = step.fork_id || '';
+    const branch = forkIds.find(fi => fid === fi || fid.startsWith(fi + '-'));
+    if (branch) byBranch.get(branch)!.push(step);
+  }
+
+  return forkIds.map(fid => {
+    const bSteps = byBranch.get(fid) || [];
+    const status = deriveBranchStatus(bSteps);
+    const running = bSteps.find(s => s.status === 'running');
+    const failed = bSteps.find(s => s.status === 'failed');
+    const currentStep = running?.step_name || failed?.step_name || bSteps[bSteps.length - 1]?.step_name || '';
+    const completed = bSteps.filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    const starts = bSteps.map(s => s.started_at).filter(Boolean) as string[];
+    const ends = bSteps.map(s => s.completed_at).filter(Boolean) as string[];
+    return {
+      key: fid.substring(forkPrefix.length + 1),
+      forkId: fid,
+      status,
+      currentStep,
+      stepsCompleted: completed,
+      stepsTotal: bSteps.length,
+      startedAt: starts.length > 0 ? starts.sort()[0] : null,
+      completedAt: status === 'completed' && ends.length > 0 ? ends.sort().reverse()[0] : null,
+    };
+  });
+}
+
+// ─── Fork detail modal ─────────────────────────────────────────────
+
+interface ForkModalProps {
+  info: { stepName: string; forkPrefix: string; forkIds: string[] } | null;
+  steps: Step[];
+  onClose: () => void;
+  onStepClick?: (step: Step) => void;
+}
+
+function badgeClass(status: string): string {
+  const map: Record<string, string> = {
+    pending: 'badge-pending',
+    running: 'badge-running',
+    completed: 'badge-completed',
+    failed: 'badge-failed',
+    skipped: 'badge-skipped',
+  };
+  return `badge ${map[status] || 'badge-pending'}`;
+}
+
+function ForkDetailModal({ info, steps, onClose, onStepClick }: ForkModalProps) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<'key' | 'status'>('key');
+
+  if (!info) return null;
+
+  const branches = buildBranchInfos(steps, info.forkPrefix, info.forkIds);
+  const sorted = [...branches].sort((a, b) => {
+    if (sortKey === 'status') {
+      const order: Record<string, number> = { running: 0, failed: 1, pending: 2, completed: 3 };
+      return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+    }
+    return a.key.localeCompare(b.key);
+  });
+
+  const statusCounts = { completed: 0, running: 0, failed: 0, skipped: 0, pending: 0 };
+  for (const b of branches) {
+    if (b.status in statusCounts) statusCounts[b.status as keyof typeof statusCounts]++;
+  }
+
+  const expandedSteps = expanded
+    ? steps.filter(s => {
+        const fid = s.fork_id || '';
+        return fid === expanded || fid.startsWith(expanded + '-');
+      })
+    : [];
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card fork-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <strong>{info.stepName}</strong>
+            <span className="fork-modal-branch-count">{branches.length} branches</span>
+            {statusCounts.completed > 0 && <span className="badge badge-completed">{statusCounts.completed}</span>}
+            {statusCounts.running > 0 && <span className="badge badge-running">{statusCounts.running}</span>}
+            {statusCounts.failed > 0 && <span className="badge badge-failed">{statusCounts.failed}</span>}
+          </div>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          <table className="fork-modal-table">
+            <thead>
+              <tr>
+                <th className="fork-modal-th" onClick={() => setSortKey('key')} style={{ cursor: 'pointer' }}>
+                  Branch {sortKey === 'key' ? '▴' : ''}
+                </th>
+                <th className="fork-modal-th" onClick={() => setSortKey('status')} style={{ cursor: 'pointer' }}>
+                  Status {sortKey === 'status' ? '▴' : ''}
+                </th>
+                <th className="fork-modal-th">Progress</th>
+                <th className="fork-modal-th">Current Step</th>
+                <th className="fork-modal-th">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(b => (
+                <>
+                  <tr
+                    key={b.forkId}
+                    className={`fork-modal-row fork-modal-row-${b.status}${expanded === b.forkId ? ' fork-modal-row-expanded' : ''}`}
+                    onClick={() => setExpanded(expanded === b.forkId ? null : b.forkId)}
+                  >
+                    <td className="fork-modal-td mono">{b.key}</td>
+                    <td className="fork-modal-td"><span className={badgeClass(b.status)}>{b.status}</span></td>
+                    <td className="fork-modal-td mono">{b.stepsCompleted}/{b.stepsTotal}</td>
+                    <td className="fork-modal-td mono">{b.currentStep}</td>
+                    <td className="fork-modal-td mono">{durationLong(b.startedAt, b.completedAt)}</td>
+                  </tr>
+                  {expanded === b.forkId && expandedSteps.length > 0 && (
+                    <tr key={b.forkId + '-detail'} className="fork-modal-detail-row">
+                      <td colSpan={5} className="fork-modal-detail-cell">
+                        <table className="fork-modal-detail-table">
+                          <tbody>
+                            {expandedSteps.map((s, idx) => (
+                              <tr
+                                key={idx}
+                                className="fork-modal-step-row"
+                                onClick={(e) => { e.stopPropagation(); onStepClick?.(s); }}
+                              >
+                                <td className="fork-modal-td mono">{s.step_name}</td>
+                                <td className="fork-modal-td"><span className={badgeClass(s.status)}>{s.status}</span></td>
+                                <td className="fork-modal-td mono">{s.step_type || '-'}</td>
+                                <td className="fork-modal-td mono">{durationLong(s.started_at, s.completed_at)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Graph builder ─────────────────────────────────────────────────
+
+interface CollapsedForkMeta {
+  stepName: string;
+  forkPrefix: string;
+  forkIds: string[];
+}
+
+function buildGraph(
+  steps: Step[],
+): { nodes: Node[]; edges: Edge[]; stepMap: Map<string, Step>; collapsedForks: Map<string, CollapsedForkMeta> } {
+  if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map(), collapsedForks: new Map() };
 
   const stepMap = new Map<string, Step>();
   const groups = new Map<string, Step[]>();
@@ -144,8 +395,9 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
     groups.get(fid)!.push(step);
   }
 
-  const nodes: Node<StepNodeData>[] = [];
+  const nodes: Node[] = [];
   const edges: Edge[] = [];
+  const collapsedForks = new Map<string, CollapsedForkMeta>();
 
   interface ChainEntry {
     step: Step;
@@ -181,6 +433,19 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
 
   function forkDisplayKey(forkId: string, forkPrefix: string): string {
     return forkId.substring(forkPrefix.length + 1);
+  }
+
+  function aggregateBranchStatuses(forkIds: string[]): { completed: number; running: number; failed: number; skipped: number; pending: number } {
+    const counts = { completed: 0, running: 0, failed: 0, skipped: 0, pending: 0 };
+    for (const fid of forkIds) {
+      const allSteps: Step[] = [];
+      for (const [gid, gsteps] of groups) {
+        if (gid === fid || gid.startsWith(fid + '-')) allSteps.push(...gsteps);
+      }
+      const status = deriveBranchStatus(allSteps);
+      if (status in counts) counts[status as keyof typeof counts]++;
+    }
+    return counts;
   }
 
   function layoutChain(
@@ -226,49 +491,96 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
 
       const forkIds = chainForkIndices.get(i);
       if (forkIds && forkIds.length > 0) {
-        const forkStartY = y;
-        const totalWidth = (forkIds.length - 1) * FORK_GAP_X;
-        const forkBaseX = x - totalWidth / 2;
-        let maxForkEndY = y;
+        if (forkIds.length > COLLAPSE_THRESHOLD) {
+          // Collapsed summary node
+          const counts = aggregateBranchStatuses(forkIds);
+          const summaryId = `summary::${forkPrefix}`;
+          const overallStatus = counts.running > 0 ? 'running' : counts.failed > 0 ? 'failed' : counts.completed === forkIds.length ? 'completed' : 'pending';
 
-        for (let fi = 0; fi < forkIds.length; fi++) {
-          const forkId = forkIds[fi];
-          const forkX = forkBaseX + fi * FORK_GAP_X;
-          const forkKey = forkDisplayKey(forkId, forkPrefix);
-          const forkChain = expandChain(forkId);
+          collapsedForks.set(summaryId, { stepName: step.step_name, forkPrefix, forkIds });
 
-          const { nodeIds: fNodeIds, endY: fEndY } = layoutChain(
-            forkChain, forkX, forkStartY, forkKey,
-          );
+          nodes.push({
+            id: summaryId,
+            type: 'forkSummary',
+            position: { x, y },
+            data: {
+              stepName: step.step_name,
+              forkPrefix,
+              totalBranches: forkIds.length,
+              ...counts,
+            },
+            draggable: false,
+          });
 
-          if (fNodeIds.length > 0) {
+          edges.push({
+            id: `${nodeId}-fork->${summaryId}`,
+            source: nodeId,
+            target: summaryId,
+            type: 'smoothstep',
+            animated: overallStatus === 'running',
+            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+            style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+          });
+
+          y += SUMMARY_NODE_H + NODE_GAP_Y;
+
+          if (i + 1 < chain.length) {
+            const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
             edges.push({
-              id: `${nodeId}-fork->${fNodeIds[0]}`,
-              source: nodeId,
-              target: fNodeIds[0],
+              id: `${summaryId}-join->${nextNodeId}`,
+              source: summaryId,
+              target: nextNodeId,
               type: 'smoothstep',
-              animated: forkChain[0]?.step.status === 'running',
               markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
               style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
             });
+          }
+        } else {
+          // Expanded fork columns
+          const forkStartY = y;
+          const totalWidth = (forkIds.length - 1) * FORK_GAP_X;
+          const forkBaseX = x - totalWidth / 2;
+          let maxForkEndY = y;
 
-            if (i + 1 < chain.length) {
-              const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
+          for (let fi = 0; fi < forkIds.length; fi++) {
+            const forkId = forkIds[fi];
+            const forkX = forkBaseX + fi * FORK_GAP_X;
+            const forkKey = forkDisplayKey(forkId, forkPrefix);
+            const forkChain = expandChain(forkId);
+
+            const { nodeIds: fNodeIds, endY: fEndY } = layoutChain(
+              forkChain, forkX, forkStartY, forkKey,
+            );
+
+            if (fNodeIds.length > 0) {
               edges.push({
-                id: `${fNodeIds[fNodeIds.length - 1]}-join->${nextNodeId}`,
-                source: fNodeIds[fNodeIds.length - 1],
-                target: nextNodeId,
+                id: `${nodeId}-fork->${fNodeIds[0]}`,
+                source: nodeId,
+                target: fNodeIds[0],
                 type: 'smoothstep',
+                animated: forkChain[0]?.step.status === 'running',
                 markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
                 style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
               });
+
+              if (i + 1 < chain.length) {
+                const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
+                edges.push({
+                  id: `${fNodeIds[fNodeIds.length - 1]}-join->${nextNodeId}`,
+                  source: fNodeIds[fNodeIds.length - 1],
+                  target: nextNodeId,
+                  type: 'smoothstep',
+                  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+                  style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+                });
+              }
             }
+
+            maxForkEndY = Math.max(maxForkEndY, fEndY);
           }
 
-          maxForkEndY = Math.max(maxForkEndY, fEndY);
+          y = maxForkEndY;
         }
-
-        y = maxForkEndY;
       }
     }
 
@@ -292,8 +604,10 @@ function buildGraph(steps: Step[]): { nodes: Node<StepNodeData>[]; edges: Edge[]
   const mainChain = expandChain('');
   layoutChain(mainChain, START_X, START_Y, '');
 
-  return { nodes, edges, stepMap };
+  return { nodes, edges, stepMap, collapsedForks };
 }
+
+// ─── Color mode hook ───────────────────────────────────────────────
 
 function useColorMode(): 'dark' | 'light' {
   const [mode, setMode] = useState<'dark' | 'light'>(
@@ -309,14 +623,19 @@ function useColorMode(): 'dark' | 'light' {
   return mode;
 }
 
+// ─── Main component ────────────────────────────────────────────────
+
 interface Props {
   steps: Step[];
   onStepClick?: (step: Step) => void;
 }
 
 export default function WorkflowGraph({ steps, onStepClick }: Props) {
-  const { nodes, edges, stepMap } = useMemo(() => buildGraph(steps), [steps]);
+  const { nodes, edges, stepMap, collapsedForks } = useMemo(() => buildGraph(steps), [steps]);
   const colorMode = useColorMode();
+  const [fullscreen, setFullscreen] = useState(false);
+  const [activeFork, setActiveFork] = useState<CollapsedForkMeta | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y), 0);
   const graphHeight = Math.max(300, maxY + NODE_H + 80);
@@ -326,37 +645,69 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
   }, []);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (node.type === 'forkSummary') {
+      const meta = collapsedForks.get(node.id);
+      if (meta) setActiveFork(meta);
+      return;
+    }
     if (!onStepClick) return;
     const step = stepMap.get(node.id);
     if (step) onStepClick(step);
-  }, [onStepClick, stepMap]);
+  }, [onStepClick, stepMap, collapsedForks]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && fullscreen) setFullscreen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fullscreen]);
 
   if (steps.length === 0) {
     return <div className="graph-empty">Waiting for steps...</div>;
   }
 
   return (
-    <div className="graph-container" style={{ height: Math.min(graphHeight, 800) }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onInit={onInit}
-        onNodeClick={handleNodeClick}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnDrag
-        zoomOnScroll
-        minZoom={0.2}
-        maxZoom={1.5}
-        colorMode={colorMode}
+    <>
+      <div
+        ref={containerRef}
+        className={`graph-container${fullscreen ? ' graph-fullscreen' : ''}`}
+        style={fullscreen ? undefined : { height: Math.min(graphHeight, 800) }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
-        <Controls showInteractive={false} />
-      </ReactFlow>
-    </div>
+        <button
+          className="graph-fullscreen-btn"
+          onClick={() => setFullscreen(!fullscreen)}
+          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {iconSvg(fullscreen ? 'shrink' : 'expand')}
+        </button>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onInit={onInit}
+          onNodeClick={handleNodeClick}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          panOnDrag
+          zoomOnScroll
+          minZoom={0.1}
+          maxZoom={1.5}
+          colorMode={colorMode}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
+      <ForkDetailModal
+        info={activeFork}
+        steps={steps}
+        onClose={() => setActiveFork(null)}
+        onStepClick={onStepClick}
+      />
+    </>
   );
 }
