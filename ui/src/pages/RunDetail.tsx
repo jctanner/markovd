@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { RunDetail as RunDetailType, Step } from '../api';
@@ -19,6 +19,23 @@ function badgeClass(status: string): string {
   return `badge ${map[status] || 'badge-pending'}`;
 }
 
+function stepsFingerprint(steps: Step[]): string {
+  let hash = steps.length;
+  for (const s of steps) {
+    hash = (hash * 31 + s.id) | 0;
+    hash = (hash * 31 + s.status.charCodeAt(0)) | 0;
+  }
+  return `${steps.length}:${hash}`;
+}
+
+function pollInterval(stepCount: number, status: string): number {
+  if (status === 'completed' || status === 'failed' || status === 'cancelled') return 30000;
+  if (stepCount > 5000) return 30000;
+  if (stepCount > 1000) return 15000;
+  if (stepCount > 500) return 10000;
+  return 3000;
+}
+
 type ViewMode = 'graph' | 'gantt' | 'table';
 
 export default function RunDetail() {
@@ -29,15 +46,65 @@ export default function RunDetail() {
   const [view, setView] = useState<ViewMode>('graph');
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
+  const fingerprintRef = useRef('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleRef = useRef(true);
+  const runRef = useRef<RunDetailType | null>(null);
 
-  const loadRun = async () => {
+  const loadRun = useCallback(async () => {
     if (!runID) return;
     try {
-      setRun(await api.getRun(runID));
+      const data = await api.getRun(runID);
+      const fp = stepsFingerprint(data.steps);
+      if (fp !== fingerprintRef.current) {
+        fingerprintRef.current = fp;
+        runRef.current = data;
+        setRun(data);
+      } else {
+        setRun(prev => {
+          if (!prev) { runRef.current = data; return data; }
+          if (prev.status !== data.status || prev.completed_at !== data.completed_at) {
+            const updated = { ...data, steps: prev.steps };
+            runRef.current = updated;
+            return updated;
+          }
+          return prev;
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load run');
     }
-  };
+  }, [runID]);
+
+  const scheduleNext = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const r = runRef.current;
+    const interval = r ? pollInterval(r.steps.length, r.status) : 3000;
+    timerRef.current = setTimeout(async () => {
+      if (visibleRef.current) {
+        await loadRun();
+      }
+      scheduleNext();
+    }, interval);
+  }, [loadRun]);
+
+  useEffect(() => {
+    fingerprintRef.current = '';
+    runRef.current = null;
+    loadRun().then(() => scheduleNext());
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [runID, loadRun, scheduleNext]);
+
+  useEffect(() => {
+    const onVisChange = () => {
+      visibleRef.current = document.visibilityState === 'visible';
+      if (visibleRef.current) loadRun();
+    };
+    document.addEventListener('visibilitychange', onVisChange);
+    return () => document.removeEventListener('visibilitychange', onVisChange);
+  }, [loadRun]);
 
   const handleCancel = async () => {
     if (!runID) return;
@@ -77,14 +144,10 @@ export default function RunDetail() {
 
   const handleStepClick = (step: Step) => setSelectedStep(step);
 
-  useEffect(() => {
-    loadRun();
-    const interval = setInterval(loadRun, 3000);
-    return () => clearInterval(interval);
-  }, [runID]);
-
   if (error) return <div className="msg-error">{error}</div>;
   if (!run) return <div className="loading-state">Loading run...</div>;
+
+  const interval = pollInterval(run.steps.length, run.status);
 
   return (
     <div>
@@ -129,6 +192,14 @@ export default function RunDetail() {
           <div className="meta-value mono">
             {run.completed_at ? new Date(run.completed_at).toLocaleString() : '-'}
           </div>
+        </div>
+        <div className="meta-card">
+          <div className="meta-label">Steps</div>
+          <div className="meta-value mono">{run.steps.length.toLocaleString()}</div>
+        </div>
+        <div className="meta-card">
+          <div className="meta-label">Refresh</div>
+          <div className="meta-value mono">{interval / 1000}s</div>
         </div>
       </div>
 
