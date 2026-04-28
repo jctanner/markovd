@@ -1971,6 +1971,22 @@ td.cell-link a:hover {
   max-height: 60vh;
 }
 
+.run-logs {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg-root);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow: auto;
+  height: calc(100vh - 360px);
+}
+
 .job-link {
   color: var(--accent);
   cursor: pointer;

@@ -239,6 +239,66 @@ func (s *Server) handleStreamJobLogs(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 }
 
+func (s *Server) handleGetRunLogs(w http.ResponseWriter, r *http.Request) {
+	runID := chi.URLParam(r, "runID")
+	if runID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "run ID required"})
+		return
+	}
+
+	logs, err := s.runner.GetJobLogs(r.Context(), runID)
+	if err == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"logs": logs, "run_id": runID})
+		return
+	}
+
+	cachedLogs, found := s.db.FindCachedJobLogs(r.Context(), runID)
+	if found {
+		writeJSON(w, http.StatusOK, map[string]string{"logs": cachedLogs, "run_id": runID, "cached": "true"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"logs": "", "run_id": runID, "error": err.Error()})
+}
+
+func (s *Server) handleStreamRunLogs(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming not supported"})
+		return
+	}
+
+	runID := chi.URLParam(r, "runID")
+	if runID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "run ID required"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	stream, err := s.runner.StreamJobLogs(r.Context(), runID)
+	if err != nil {
+		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		flusher.Flush()
+		return
+	}
+	defer stream.Close()
+
+	scanner := bufio.NewScanner(stream)
+	for scanner.Scan() {
+		if r.Context().Err() != nil {
+			return
+		}
+		fmt.Fprintf(w, "data: %s\n\n", scanner.Text())
+		flusher.Flush()
+	}
+
+	fmt.Fprintf(w, "event: done\ndata: stream ended\n\n")
+	flusher.Flush()
+}
+
 func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "runID")
 
@@ -252,10 +312,8 @@ func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if run.Status == "running" || run.Status == "pending" {
-		if err := s.runner.Cancel(runID); err != nil {
-			log.Printf("Warning: cancel runner for %s before delete: %v", runID, err)
-		}
+	if err := s.runner.Cancel(runID); err != nil {
+		log.Printf("Warning: cleanup K8s resources for %s: %v", runID, err)
 	}
 
 	if err := s.db.DeleteRun(r.Context(), runID); err != nil {

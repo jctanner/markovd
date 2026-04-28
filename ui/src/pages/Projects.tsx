@@ -24,6 +24,7 @@ export default function Projects() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   const loadProjects = async () => {
     try {
@@ -64,6 +65,7 @@ export default function Projects() {
       setName('');
       setUrl('');
       setBranch('');
+      setShowAdd(false);
       loadProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
@@ -145,156 +147,166 @@ export default function Projects() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Projects</h1>
+        <button className="btn btn-primary btn-sm" onClick={() => { setShowAdd(true); setError(''); setSuccess(''); }}>
+          Add Project
+        </button>
       </div>
 
-      <div className="split-layout">
-        <div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>URL</th>
-                  <th>Branch</th>
-                  <th>Status</th>
-                  <th>Last Synced</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projects.map((p) => (
-                  <tr
-                    key={p.id}
-                    className={`wf-row${selected?.id === p.id ? ' selected' : ''}`}
-                    onClick={() => setSelected(p)}
+      {error && !showAdd && <div className="msg-error">{error}</div>}
+      {success && !showAdd && <div className="msg-success">{success}</div>}
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>URL</th>
+              <th>Branch</th>
+              <th>Status</th>
+              <th>Last Synced</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map((p) => (
+              <tr
+                key={p.id}
+                className={`wf-row${selected?.id === p.id ? ' selected' : ''}`}
+                onClick={() => setSelected(p)}
+              >
+                <td className="cell-mono">{p.name}</td>
+                <td className="cell-mono" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.url}</td>
+                <td className="cell-mono">{p.branch}</td>
+                <td><span className={badgeClass(p.sync_status)}>{p.sync_status}</span></td>
+                <td className="cell-mono">
+                  {p.last_synced_at ? new Date(p.last_synced_at).toLocaleString() : '—'}
+                </td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => handleSync(p)}
+                    disabled={syncing === p.id}
                   >
-                    <td className="cell-mono">{p.name}</td>
-                    <td className="cell-mono" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.url}</td>
-                    <td className="cell-mono">{p.branch}</td>
-                    <td><span className={badgeClass(p.sync_status)}>{p.sync_status}</span></td>
-                    <td className="cell-mono">
-                      {p.last_synced_at ? new Date(p.last_synced_at).toLocaleString() : '—'}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => handleSync(p)}
-                        disabled={syncing === p.id}
-                      >
-                        {syncing === p.id ? 'Syncing...' : 'Sync'}
-                      </button>
-                      {' '}
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(p)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {projects.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="table-empty">
-                      No projects added yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {selected && selected.sync_status === 'synced' && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div className="section-heading" style={{ margin: 0 }}>
-                  {selected.name} — Workflow Files
-                </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleImport}
-                  disabled={selectedFiles.size === 0 || importing}
-                >
-                  {importing ? 'Importing...' : `Import Selected (${selectedFiles.size})`}
-                </button>
-              </div>
-              {files.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>No YAML files found in repository.</p>
-              ) : (
-                <ul className="file-tree">
-                  {files.map((f) => (
-                    <li key={f.path} className={`file-tree-item${f.imported ? ' imported' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={f.imported || selectedFiles.has(f.path)}
-                        disabled={f.imported}
-                        onChange={() => toggleFile(f.path)}
-                      />
-                      <span>{f.path}</span>
-                      {f.imported && <span className="source-badge source-badge-project">imported</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {selected && selected.sync_status === 'error' && (
-            <div style={{ marginTop: 20 }}>
-              <div className="msg-error">{selected.sync_error}</div>
-            </div>
-          )}
-
-          {selected && selected.sync_status === 'idle' && (
-            <div style={{ marginTop: 20, color: 'var(--text-muted)' }}>
-              Click <strong>Sync</strong> to clone the repository and browse workflow files.
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card-title">Add Project</div>
-          {error && <div className="msg-error">{error}</div>}
-          {success && <div className="msg-success">{success}</div>}
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Name</label>
-              <input
-                type="text"
-                className="form-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="my-project"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Git URL</label>
-              <input
-                type="text"
-                className="form-input"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://github.com/org/repo.git"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Branch</label>
-              <input
-                type="text"
-                className="form-input"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder="main"
-              />
-            </div>
-            <button type="submit" className="btn btn-primary">
-              Add Project
-            </button>
-          </form>
-        </div>
+                    {syncing === p.id ? 'Syncing...' : 'Sync'}
+                  </button>
+                  {' '}
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => handleDelete(p)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {projects.length === 0 && (
+              <tr>
+                <td colSpan={6} className="table-empty">
+                  No projects added yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+
+      {selected && selected.sync_status === 'synced' && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="section-heading" style={{ margin: 0 }}>
+              {selected.name} — Workflow Files
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleImport}
+              disabled={selectedFiles.size === 0 || importing}
+            >
+              {importing ? 'Importing...' : `Import Selected (${selectedFiles.size})`}
+            </button>
+          </div>
+          {files.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>No YAML files found in repository.</p>
+          ) : (
+            <ul className="file-tree">
+              {files.map((f) => (
+                <li key={f.path} className={`file-tree-item${f.imported ? ' imported' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={f.imported || selectedFiles.has(f.path)}
+                    disabled={f.imported}
+                    onChange={() => toggleFile(f.path)}
+                  />
+                  <span>{f.path}</span>
+                  {f.imported && <span className="source-badge source-badge-project">imported</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {selected && selected.sync_status === 'error' && (
+        <div style={{ marginTop: 20 }}>
+          <div className="msg-error">{selected.sync_error}</div>
+        </div>
+      )}
+
+      {selected && selected.sync_status === 'idle' && (
+        <div style={{ marginTop: 20, color: 'var(--text-muted)' }}>
+          Click <strong>Sync</strong> to clone the repository and browse workflow files.
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="modal-backdrop" onClick={() => setShowAdd(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Add Project</span>
+              <button className="modal-close" onClick={() => setShowAdd(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {error && <div className="msg-error">{error}</div>}
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="my-project"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Git URL</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://github.com/org/repo.git"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Branch</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary">
+                  Add Project
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

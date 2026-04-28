@@ -7,7 +7,7 @@ import (
 )
 
 type diagramWorkflowFile struct {
-	Entrypoint string           `yaml:"entrypoint"`
+	Entrypoint string            `yaml:"entrypoint"`
 	Workflows  []diagramWorkflow `yaml:"workflows"`
 }
 
@@ -52,12 +52,12 @@ type DiagramNode struct {
 }
 
 type DiagramEdge struct {
-	ID        string                 `json:"id"`
-	Source    string                 `json:"source"`
-	Target    string                 `json:"target"`
-	Type      string                 `json:"type"`
-	Animated  bool                   `json:"animated"`
-	Style     map[string]interface{} `json:"style,omitempty"`
+	ID       string                 `json:"id"`
+	Source   string                 `json:"source"`
+	Target   string                 `json:"target"`
+	Type     string                 `json:"type"`
+	Animated bool                   `json:"animated"`
+	Style    map[string]interface{} `json:"style,omitempty"`
 }
 
 type DiagramResponse struct {
@@ -72,7 +72,8 @@ const (
 	groupPadX   = 30.0
 	groupPadTop = 50.0
 	groupPadBot = 20.0
-	subWfGapY   = 40.0
+	colGap      = 80.0
+	groupGapY   = 40.0
 )
 
 type diagramIDGen struct {
@@ -116,13 +117,135 @@ func generateDiagramFromYAML(yamlContent string) (*DiagramResponse, error) {
 		entry = wf.Workflows[0].Name
 	}
 
-	idGen := &diagramIDGen{counter: 0}
+	type wfPlacement struct {
+		name       string
+		column     int
+		callerWf   string
+		callerStep int
+	}
+	var placements []wfPlacement
 	rendered := make(map[string]bool)
+
+	var collect func(name string, col int, caller string, stepIdx int)
+	collect = func(name string, col int, caller string, stepIdx int) {
+		if _, ok := wfMap[name]; !ok || rendered[name] {
+			return
+		}
+		rendered[name] = true
+		placements = append(placements, wfPlacement{name, col, caller, stepIdx})
+		for i, step := range wfMap[name].Steps {
+			if step.Workflow != "" {
+				collect(step.Workflow, col+1, name, i)
+			}
+		}
+	}
+	collect(entry, 0, "", 0)
+
+	colPitch := nodeW + 2*groupPadX + colGap
+	stepPitch := nodeH + nodeGapY
+
+	type placedInfo struct {
+		groupID string
+		nodeIDs []string
+		y       float64
+	}
+	placed := make(map[string]*placedInfo)
+	colNextY := make(map[int]float64)
+	idGen := &diagramIDGen{}
 
 	var nodes []DiagramNode
 	var edges []DiagramEdge
 
-	layoutWorkflow(&nodes, &edges, wfMap, entry, idGen, rendered, 0, 40, "")
+	for _, p := range placements {
+		wfDef := wfMap[p.name]
+		nSteps := len(wfDef.Steps)
+		h := groupPadTop + groupPadBot
+		if nSteps > 0 {
+			h = groupPadTop + float64(nSteps)*nodeH + float64(nSteps-1)*nodeGapY + groupPadBot
+		}
+
+		var desiredY float64
+		if parent := placed[p.callerWf]; parent != nil {
+			desiredY = parent.y + groupPadTop + float64(p.callerStep)*stepPitch
+		}
+		if colNextY[p.column] > desiredY {
+			desiredY = colNextY[p.column]
+		}
+		colNextY[p.column] = desiredY + h + groupGapY
+
+		x := float64(p.column) * colPitch
+		groupID := idGen.next("g")
+		nodes = append(nodes, DiagramNode{
+			ID:       groupID,
+			Type:     "group",
+			Position: DiagramPosition{X: x, Y: desiredY},
+			Data:     DiagramNodeData{Label: p.name, WorkflowGroup: p.name, Category: "group"},
+			Style:    map[string]interface{}{"width": nodeW + 2*groupPadX, "height": h},
+		})
+
+		var nodeIDs []string
+		for i, step := range wfDef.Steps {
+			nid := idGen.next("s")
+			nodes = append(nodes, DiagramNode{
+				ID:       nid,
+				Type:     "workflowStep",
+				Position: DiagramPosition{X: groupPadX, Y: groupPadTop + float64(i)*stepPitch},
+				Data: DiagramNodeData{
+					Label:         step.Name,
+					StepType:      step.Type,
+					Category:      stepCategory(step),
+					ForEach:       step.ForEach,
+					SubWorkflow:   step.Workflow,
+					When:          step.When,
+					Rules:         step.Rules,
+					WorkflowGroup: p.name,
+				},
+				ParentID: groupID,
+				Extent:   "parent",
+			})
+			nodeIDs = append(nodeIDs, nid)
+		}
+
+		for i := 0; i < len(nodeIDs)-1; i++ {
+			edges = append(edges, DiagramEdge{
+				ID:     fmt.Sprintf("%s->%s", nodeIDs[i], nodeIDs[i+1]),
+				Source: nodeIDs[i],
+				Target: nodeIDs[i+1],
+				Type:   "smoothstep",
+			})
+		}
+
+		placed[p.name] = &placedInfo{groupID: groupID, nodeIDs: nodeIDs, y: desiredY}
+	}
+
+	for _, p := range placements {
+		wfDef := wfMap[p.name]
+		info := placed[p.name]
+		if info == nil {
+			continue
+		}
+		for i, step := range wfDef.Steps {
+			if step.Workflow == "" || i >= len(info.nodeIDs) {
+				continue
+			}
+			target := placed[step.Workflow]
+			if target == nil || len(target.nodeIDs) == 0 {
+				continue
+			}
+			e := DiagramEdge{
+				ID:     fmt.Sprintf("%s-.->%s", info.nodeIDs[i], target.nodeIDs[0]),
+				Source: info.nodeIDs[i],
+				Target: target.nodeIDs[0],
+				Type:   "smoothstep",
+				Style:  map[string]interface{}{"strokeDasharray": "6 3", "opacity": 0.6},
+			}
+			if step.Workflow == p.name {
+				e.Animated = true
+				e.Style["opacity"] = 0.4
+			}
+			edges = append(edges, e)
+		}
+	}
 
 	if nodes == nil {
 		nodes = []DiagramNode{}
@@ -130,145 +253,5 @@ func generateDiagramFromYAML(yamlContent string) (*DiagramResponse, error) {
 	if edges == nil {
 		edges = []DiagramEdge{}
 	}
-
 	return &DiagramResponse{Nodes: nodes, Edges: edges}, nil
-}
-
-type layoutResult struct {
-	nodeIDs []string
-	endY    float64
-}
-
-func layoutWorkflow(
-	nodes *[]DiagramNode,
-	edges *[]DiagramEdge,
-	wfMap map[string]*diagramWorkflow,
-	name string,
-	idGen *diagramIDGen,
-	rendered map[string]bool,
-	startX, startY float64,
-	parentGroupID string,
-) *layoutResult {
-	wf, ok := wfMap[name]
-	if !ok || rendered[name] {
-		return nil
-	}
-	rendered[name] = true
-
-	isRoot := parentGroupID == ""
-	groupID := ""
-	stepOffsetX := startX
-	stepOffsetY := startY
-
-	if !isRoot {
-		groupID = idGen.next("g")
-		stepOffsetX = groupPadX
-		stepOffsetY = groupPadTop
-	}
-
-	var nodeIDs []string
-	y := stepOffsetY
-
-	for _, step := range wf.Steps {
-		nodeID := idGen.next("s")
-		cat := stepCategory(step)
-
-		node := DiagramNode{
-			ID:   nodeID,
-			Type: "workflowStep",
-			Position: DiagramPosition{
-				X: stepOffsetX,
-				Y: y,
-			},
-			Data: DiagramNodeData{
-				Label:         step.Name,
-				StepType:      step.Type,
-				Category:      cat,
-				ForEach:       step.ForEach,
-				SubWorkflow:   step.Workflow,
-				When:          step.When,
-				Rules:         step.Rules,
-				WorkflowGroup: name,
-			},
-		}
-
-		if groupID != "" {
-			node.ParentID = groupID
-			node.Extent = "parent"
-		}
-
-		*nodes = append(*nodes, node)
-		nodeIDs = append(nodeIDs, nodeID)
-		y += nodeH + nodeGapY
-	}
-
-	for i := 0; i < len(nodeIDs)-1; i++ {
-		*edges = append(*edges, DiagramEdge{
-			ID:     fmt.Sprintf("%s->%s", nodeIDs[i], nodeIDs[i+1]),
-			Source: nodeIDs[i],
-			Target: nodeIDs[i+1],
-			Type:   "smoothstep",
-		})
-	}
-
-	groupEndY := y - nodeGapY + groupPadBot
-	if len(wf.Steps) == 0 {
-		groupEndY = stepOffsetY + groupPadBot
-	}
-
-	if groupID != "" {
-		groupNode := DiagramNode{
-			ID:   groupID,
-			Type: "group",
-			Position: DiagramPosition{
-				X: startX,
-				Y: startY,
-			},
-			Data: DiagramNodeData{
-				Label:         name,
-				WorkflowGroup: name,
-				Category:      "group",
-			},
-			Style: map[string]interface{}{
-				"width":  nodeW + 2*groupPadX,
-				"height": groupEndY,
-			},
-		}
-		if parentGroupID != "" {
-			groupNode.ParentID = parentGroupID
-			groupNode.Extent = "parent"
-		}
-		*nodes = append(*nodes, groupNode)
-	}
-
-	absoluteEndY := startY + groupEndY
-	if isRoot {
-		absoluteEndY = y
-	}
-
-	subY := absoluteEndY + subWfGapY
-	for i, step := range wf.Steps {
-		if step.Workflow == "" {
-			continue
-		}
-		childResult := layoutWorkflow(nodes, edges, wfMap, step.Workflow, idGen, rendered, startX, subY, "")
-		if childResult != nil && len(childResult.nodeIDs) > 0 && i < len(nodeIDs) {
-			*edges = append(*edges, DiagramEdge{
-				ID:     fmt.Sprintf("%s-.->%s", nodeIDs[i], childResult.nodeIDs[0]),
-				Source: nodeIDs[i],
-				Target: childResult.nodeIDs[0],
-				Type:   "smoothstep",
-				Style: map[string]interface{}{
-					"strokeDasharray": "6 3",
-					"opacity":         "0.6",
-				},
-			})
-			subY = childResult.endY + subWfGapY
-		}
-	}
-
-	return &layoutResult{
-		nodeIDs: nodeIDs,
-		endY:    subY,
-	}
 }

@@ -29,6 +29,8 @@ export default function Runs() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [error, setError] = useState('');
   const [rerunTarget, setRerunTarget] = useState<Run | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const loadRuns = async () => {
     try {
@@ -51,9 +53,49 @@ export default function Runs() {
     if (!window.confirm(`Delete run ${runID}? This cannot be undone.`)) return;
     try {
       await api.deleteRun(runID);
+      setSelected(prev => { const next = new Set(prev); next.delete(runID); return next; });
       await loadRuns();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete run');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} run${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setDeleting(true);
+    setError('');
+    const ids = [...selected];
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await api.deleteRun(id);
+      } catch {
+        failed++;
+      }
+    }
+    setSelected(new Set());
+    await loadRuns();
+    setDeleting(false);
+    if (failed > 0) {
+      setError(`Failed to delete ${failed} of ${ids.length} runs`);
+    }
+  };
+
+  const toggleSelect = (runID: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(runID)) next.delete(runID);
+      else next.add(runID);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === runs.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(runs.map(r => r.run_id)));
     }
   };
 
@@ -78,11 +120,24 @@ export default function Runs() {
     return () => clearInterval(interval);
   }, []);
 
+  const allSelected = runs.length > 0 && selected.size === runs.length;
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Runs</h1>
-        <Link to="/trigger" className="btn btn-primary btn-sm">New Run</Link>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {selected.size > 0 && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : `Delete ${selected.size} selected`}
+            </button>
+          )}
+          <Link to="/trigger" className="btn btn-primary btn-sm">New Run</Link>
+        </div>
       </div>
 
       {error && <div className="msg-error">{error}</div>}
@@ -91,6 +146,14 @@ export default function Runs() {
         <table>
           <thead>
             <tr>
+              <th style={{ width: 36 }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  title={allSelected ? 'Deselect all' : 'Select all'}
+                />
+              </th>
               <th>Run ID</th>
               <th>Workflow</th>
               <th>Status</th>
@@ -102,6 +165,13 @@ export default function Runs() {
           <tbody>
             {runs.map((run) => (
               <tr key={run.run_id}>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(run.run_id)}
+                    onChange={() => toggleSelect(run.run_id)}
+                  />
+                </td>
                 <td className="cell-link">
                   <Link to={`/runs/${run.run_id}`}>{run.run_id}</Link>
                 </td>
@@ -134,7 +204,7 @@ export default function Runs() {
             ))}
             {runs.length === 0 && (
               <tr>
-                <td colSpan={6} className="table-empty">
+                <td colSpan={7} className="table-empty">
                   No runs yet. <Link to="/trigger">Trigger one</Link>.
                 </td>
               </tr>

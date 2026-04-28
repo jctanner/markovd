@@ -7,6 +7,7 @@ import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
 import RerunModal from '../components/RerunModal';
+import RunLogs from '../components/RunLogs';
 import WorkflowStructureGraph from '../components/WorkflowStructureGraph';
 import type { DiagramResponse } from '../api';
 
@@ -44,7 +45,9 @@ function mergeSteps(existing: Step[], delta: Step[]): Step[] {
   return [...map.values()].sort((a, b) => a.id - b.id);
 }
 
-type ViewMode = 'graph' | 'gantt' | 'table';
+type ViewMode = 'graph' | 'gantt' | 'table' | 'logs';
+
+const LARGE_RUN_THRESHOLD = 25;
 
 export default function RunDetail() {
   const { runID } = useParams<{ runID: string }>();
@@ -52,6 +55,7 @@ export default function RunDetail() {
   const [run, setRun] = useState<RunDetailType | null>(null);
   const [error, setError] = useState('');
   const [view, setView] = useState<ViewMode>('graph');
+  const viewInitialized = useRef(false);
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
   const [diagram, setDiagram] = useState<DiagramResponse | null>(null);
@@ -70,6 +74,12 @@ export default function RunDetail() {
 
       if (!initialLoadDone.current || !since) {
         initialLoadDone.current = true;
+        if (!viewInitialized.current) {
+          viewInitialized.current = true;
+          if (data.steps.length > LARGE_RUN_THRESHOLD) {
+            setView('logs');
+          }
+        }
         sinceRef.current = maxUpdatedAt(data.steps);
         runRef.current = data;
         setRun(data);
@@ -175,6 +185,18 @@ export default function RunDetail() {
     }
   };
 
+  const switchView = (newView: ViewMode) => {
+    if (
+      run &&
+      run.steps.length > LARGE_RUN_THRESHOLD &&
+      newView !== 'logs' &&
+      !window.confirm(`This run has ${run.steps.length.toLocaleString()} steps. Rendering the ${newView} view may be slow. Continue?`)
+    ) {
+      return;
+    }
+    setView(newView);
+  };
+
   const handleStepClick = (step: Step) => setSelectedStep(step);
 
   if (error) return <div className="msg-error">{error}</div>;
@@ -276,26 +298,33 @@ export default function RunDetail() {
         <div className="section-heading" style={{ margin: 0, flex: 1 }}>Steps</div>
         <div className="view-toggle">
           <button
+            className={`view-toggle-btn${view === 'logs' ? ' active' : ''}`}
+            onClick={() => switchView('logs')}
+          >
+            Logs
+          </button>
+          <button
             className={`view-toggle-btn${view === 'graph' ? ' active' : ''}`}
-            onClick={() => setView('graph')}
+            onClick={() => switchView('graph')}
           >
             Graph
           </button>
           <button
             className={`view-toggle-btn${view === 'gantt' ? ' active' : ''}`}
-            onClick={() => setView('gantt')}
+            onClick={() => switchView('gantt')}
           >
             Gantt
           </button>
           <button
             className={`view-toggle-btn${view === 'table' ? ' active' : ''}`}
-            onClick={() => setView('table')}
+            onClick={() => switchView('table')}
           >
             Table
           </button>
         </div>
       </div>
 
+      {view === 'logs' && <RunLogs runID={run.run_id} status={run.status} />}
       {view === 'graph' && <WorkflowGraph steps={run.steps} onStepClick={handleStepClick} />}
       {view === 'gantt' && <GanttChart steps={run.steps} onStepClick={handleStepClick} />}
       {view === 'table' && <StepTable steps={run.steps} onStepClick={handleStepClick} />}

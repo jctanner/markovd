@@ -117,6 +117,7 @@ export interface UserPreferences {
 }
 
 export interface DiagramNodeData {
+  [key: string]: unknown;
   label: string;
   stepType: string;
   category: string;
@@ -188,6 +189,12 @@ export const api = {
   getJobLogs(jobName: string) {
     return request<{ logs: string; job_name: string; cached?: string; error?: string }>(
       `/jobs/${encodeURIComponent(jobName)}/logs`
+    );
+  },
+
+  getRunLogs(runID: string) {
+    return request<{ logs: string; run_id: string; cached?: string; error?: string }>(
+      `/runs/${encodeURIComponent(runID)}/logs`
     );
   },
 
