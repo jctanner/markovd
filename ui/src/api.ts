@@ -116,6 +116,23 @@ export interface UserPreferences {
   default_secrets: VolumeDefault[];
 }
 
+export interface ActiveJob {
+  kind: string;
+  run_id: string;
+  fork_id: string;
+  workflow_name: string;
+  step_name: string;
+  step_type: string;
+  status: string;
+  job_name: string;
+  started_at: string | null;
+}
+
+export interface ConcurrencyBucket {
+  t: string;
+  count: number;
+}
+
 export interface DiagramNodeData {
   [key: string]: unknown;
   label: string;
@@ -196,6 +213,25 @@ export const api = {
     return request<{ logs: string; run_id: string; cached?: string; error?: string }>(
       `/runs/${encodeURIComponent(runID)}/logs`
     );
+  },
+
+  getActiveJobs() {
+    return request<{ total: number; running: number; pending: number }>('/jobs/active');
+  },
+
+  listActiveJobs() {
+    return request<ActiveJob[]>('/jobs/list');
+  },
+
+  getConcurrencyHistory() {
+    return request<ConcurrencyBucket[]>('/jobs/concurrency');
+  },
+
+  cancelJob(job: { kind: string; run_id: string; fork_id: string; workflow_name: string; step_name: string }) {
+    return request<{ status: string }>('/jobs/cancel', {
+      method: 'POST',
+      body: JSON.stringify(job),
+    });
   },
 
   listRuns() {

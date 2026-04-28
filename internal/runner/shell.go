@@ -108,3 +108,8 @@ func (r *ShellRunner) GetJobLogs(ctx context.Context, jobName string) (string, e
 func (r *ShellRunner) StreamJobLogs(ctx context.Context, jobName string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("log streaming not available in shell mode")
 }
+
+func (r *ShellRunner) AuditJobStatuses(ctx context.Context) (map[string]string, error) {
+	return nil, nil
+}
+

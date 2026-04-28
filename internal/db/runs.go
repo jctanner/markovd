@@ -93,6 +93,92 @@ func (d *DB) DeleteRun(ctx context.Context, runID string) error {
 	return tx.Commit()
 }
 
+func (d *DB) CountActiveJobs(ctx context.Context) (running, pending int, err error) {
+	err = d.QueryRowContext(ctx,
+		`SELECT
+			COUNT(*) FILTER (WHERE status = 'running'),
+			COUNT(*) FILTER (WHERE status = 'pending')
+		FROM (
+			SELECT status FROM runs WHERE status IN ('running', 'pending')
+			UNION ALL
+			SELECT status FROM steps
+			WHERE status IN ('running', 'pending')
+			  AND COALESCE(output_json::jsonb->>'job_name', '') != ''
+		) sub`,
+	).Scan(&running, &pending)
+	return
+}
+
+func (d *DB) ListActiveJobs(ctx context.Context) ([]models.ActiveJob, error) {
+	rows, err := d.QueryContext(ctx,
+		`SELECT kind, run_id, fork_id, workflow_name, step_name, step_type, status, job_name, started_at
+		FROM (
+			SELECT 'run' AS kind, run_id, '' AS fork_id, workflow_name,
+			       '' AS step_name, '' AS step_type, status, run_id AS job_name, started_at
+			FROM runs WHERE status IN ('running', 'pending')
+			UNION ALL
+			SELECT 'step' AS kind, run_id, COALESCE(fork_id, ''), workflow_name,
+			       step_name, COALESCE(step_type, ''), status,
+			       COALESCE(output_json::jsonb->>'job_name', ''), started_at
+			FROM steps
+			WHERE status IN ('running', 'pending')
+			  AND COALESCE(output_json::jsonb->>'job_name', '') != ''
+		) sub ORDER BY started_at DESC NULLS LAST`)
+	if err != nil {
+		return nil, fmt.Errorf("listing active jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []models.ActiveJob
+	for rows.Next() {
+		var j models.ActiveJob
+		if err := rows.Scan(&j.Kind, &j.RunID, &j.ForkID, &j.WorkflowName, &j.StepName, &j.StepType, &j.Status, &j.JobName, &j.StartedAt); err != nil {
+			return nil, fmt.Errorf("scanning active job: %w", err)
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
+func (d *DB) GetConcurrencyHistory(ctx context.Context) ([]models.ConcurrencyBucket, error) {
+	rows, err := d.QueryContext(ctx,
+		`WITH buckets AS (
+			SELECT generate_series(
+				date_trunc('minute', now() - interval '24 hours'),
+				now(),
+				interval '15 minutes'
+			) AS t
+		),
+		jobs AS (
+			SELECT started_at, completed_at FROM runs
+			WHERE started_at > now() - interval '25 hours'
+			UNION ALL
+			SELECT started_at, completed_at FROM steps
+			WHERE started_at > now() - interval '25 hours'
+			  AND COALESCE(output_json::jsonb->>'job_name', '') != ''
+		)
+		SELECT b.t, COUNT(j.started_at)
+		FROM buckets b
+		LEFT JOIN jobs j ON j.started_at < b.t + interval '15 minutes'
+		  AND (j.completed_at IS NULL OR j.completed_at >= b.t)
+		GROUP BY b.t
+		ORDER BY b.t`)
+	if err != nil {
+		return nil, fmt.Errorf("concurrency history: %w", err)
+	}
+	defer rows.Close()
+
+	var buckets []models.ConcurrencyBucket
+	for rows.Next() {
+		var b models.ConcurrencyBucket
+		if err := rows.Scan(&b.T, &b.Count); err != nil {
+			return nil, fmt.Errorf("scanning bucket: %w", err)
+		}
+		buckets = append(buckets, b)
+	}
+	return buckets, rows.Err()
+}
+
 func (d *DB) UpsertRunFromEvent(ctx context.Context, runID, workflowName, status string, startedAt, completedAt *time.Time) error {
 	_, err := d.ExecContext(ctx,
 		`INSERT INTO runs (run_id, workflow_name, status, started_at, completed_at)

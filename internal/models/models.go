@@ -68,6 +68,23 @@ type Step struct {
 	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 }
 
+type ActiveJob struct {
+	Kind         string     `json:"kind"`
+	RunID        string     `json:"run_id"`
+	ForkID       string     `json:"fork_id,omitempty"`
+	WorkflowName string     `json:"workflow_name"`
+	StepName     string     `json:"step_name,omitempty"`
+	StepType     string     `json:"step_type,omitempty"`
+	Status       string     `json:"status"`
+	JobName      string     `json:"job_name,omitempty"`
+	StartedAt    *time.Time `json:"started_at,omitempty"`
+}
+
+type ConcurrencyBucket struct {
+	T     time.Time `json:"t"`
+	Count int       `json:"count"`
+}
+
 type Event struct {
 	ID         int       `json:"id"`
 	RunID      string    `json:"run_id"`

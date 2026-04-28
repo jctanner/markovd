@@ -308,6 +308,28 @@ func (r *KubernetesRunner) StreamJobLogs(ctx context.Context, jobName string) (i
 	return req.Stream(ctx)
 }
 
+func (r *KubernetesRunner) AuditJobStatuses(ctx context.Context) (map[string]string, error) {
+	jobs, err := r.client.BatchV1().Jobs(r.namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing jobs: %w", err)
+	}
+
+	statuses := make(map[string]string, len(jobs.Items))
+	for _, j := range jobs.Items {
+		switch {
+		case j.Status.Succeeded > 0:
+			statuses[j.Name] = "completed"
+		case j.Status.Failed > 0:
+			statuses[j.Name] = "failed"
+		case j.Status.Active > 0:
+			statuses[j.Name] = "running"
+		default:
+			statuses[j.Name] = "pending"
+		}
+	}
+	return statuses, nil
+}
+
 func generateRunID() string {
 	b := make([]byte, 4)
 	rand.Read(b)

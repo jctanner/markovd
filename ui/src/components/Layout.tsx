@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { useTheme } from '../theme';
+import { api } from '../api';
 
 function SunIcon() {
   return (
@@ -31,6 +33,16 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggle } = useTheme();
+  const [activeJobs, setActiveJobs] = useState<{ total: number; running: number; pending: number } | null>(null);
+
+  useEffect(() => {
+    const poll = () => {
+      api.getActiveJobs().then(setActiveJobs).catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -56,6 +68,7 @@ export default function Layout() {
             </Link>
             <div className="nav-links">
               <Link to="/runs" className={linkClass('/runs')}>Runs</Link>
+              <Link to="/jobs" className={linkClass('/jobs')}>Jobs</Link>
               <Link to="/workflows" className={linkClass('/workflows')}>Workflows</Link>
               <Link to="/projects" className={linkClass('/projects')}>Projects</Link>
               <Link to="/trigger" className={linkClass('/trigger')}>Trigger</Link>
@@ -63,6 +76,11 @@ export default function Layout() {
             </div>
           </div>
           <div className="nav-right">
+            {activeJobs && activeJobs.total > 0 && (
+              <Link to="/jobs" className="nav-jobs-badge" title={`${activeJobs.running} running, ${activeJobs.pending} pending`}>
+                {activeJobs.total} job{activeJobs.total !== 1 ? 's' : ''}
+              </Link>
+            )}
             <button
               onClick={toggle}
               className="theme-toggle"

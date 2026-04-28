@@ -72,6 +72,10 @@ func (s *Server) Router() http.Handler {
 			r.Get("/preferences", s.handleGetPreferences)
 			r.Put("/preferences", s.handleUpdatePreferences)
 
+			r.Get("/jobs/active", s.handleActiveJobs)
+			r.Get("/jobs/list", s.handleListActiveJobs)
+			r.Get("/jobs/concurrency", s.handleConcurrencyHistory)
+			r.Post("/jobs/cancel", s.handleCancelJob)
 			r.Get("/jobs/{name}/logs", s.handleGetJobLogs)
 			r.Get("/jobs/{name}/logs/stream", s.handleStreamJobLogs)
 

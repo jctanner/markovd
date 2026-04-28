@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -53,6 +54,33 @@ func (d *DB) GetStepsUpdatedSince(ctx context.Context, runID string, since time.
 		steps = append(steps, s)
 	}
 	return steps, rows.Err()
+}
+
+func (d *DB) GetStepByKey(ctx context.Context, runID, forkID, workflowName, stepName string) (*models.Step, error) {
+	var s models.Step
+	err := d.QueryRowContext(ctx,
+		`SELECT id, run_id, COALESCE(fork_id, ''), workflow_name, step_name, COALESCE(step_type, ''), status,
+		        COALESCE(output_json, ''), COALESCE(error, ''), started_at, completed_at, updated_at
+		 FROM steps WHERE run_id = $1 AND fork_id = $2 AND workflow_name = $3 AND step_name = $4`,
+		runID, forkID, workflowName, stepName,
+	).Scan(&s.ID, &s.RunID, &s.ForkID, &s.WorkflowName, &s.StepName, &s.StepType, &s.Status,
+		&s.OutputJSON, &s.Error, &s.StartedAt, &s.CompletedAt, &s.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting step: %w", err)
+	}
+	return &s, nil
+}
+
+func (d *DB) UpdateStepStatus(ctx context.Context, runID, forkID, workflowName, stepName, status string, completedAt *time.Time) error {
+	_, err := d.ExecContext(ctx,
+		`UPDATE steps SET status = $5, completed_at = $6, updated_at = now()
+		 WHERE run_id = $1 AND fork_id = $2 AND workflow_name = $3 AND step_name = $4`,
+		runID, forkID, workflowName, stepName, status, completedAt,
+	)
+	return err
 }
 
 func (d *DB) UpsertStep(ctx context.Context, runID, forkID, workflowName, stepName, stepType, status, outputJSON, stepError string, startedAt, completedAt *time.Time) error {

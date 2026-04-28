@@ -47,6 +47,7 @@ type Runner interface {
 	ListSecrets(ctx context.Context) ([]SecretInfo, error)
 	GetJobLogs(ctx context.Context, jobName string) (string, error)
 	StreamJobLogs(ctx context.Context, jobName string) (io.ReadCloser, error)
+	AuditJobStatuses(ctx context.Context) (map[string]string, error)
 }
 
 func ParseVolumes(s string) []PVCMount {
