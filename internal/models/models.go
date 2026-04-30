@@ -85,6 +85,13 @@ type ConcurrencyBucket struct {
 	Count int       `json:"count"`
 }
 
+type DurationBucket struct {
+	T          time.Time `json:"t"`
+	AvgSeconds float64   `json:"avg_seconds"`
+	MaxSeconds float64   `json:"max_seconds"`
+	Count      int       `json:"count"`
+}
+
 type Event struct {
 	ID         int       `json:"id"`
 	RunID      string    `json:"run_id"`

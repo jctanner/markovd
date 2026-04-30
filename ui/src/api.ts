@@ -133,6 +133,13 @@ export interface ConcurrencyBucket {
   count: number;
 }
 
+export interface DurationBucket {
+  t: string;
+  avg_seconds: number;
+  max_seconds: number;
+  count: number;
+}
+
 export interface DiagramNodeData {
   [key: string]: unknown;
   label: string;
@@ -225,6 +232,10 @@ export const api = {
 
   getConcurrencyHistory() {
     return request<ConcurrencyBucket[]>('/jobs/concurrency');
+  },
+
+  getDurationHistory() {
+    return request<DurationBucket[]>('/jobs/durations');
   },
 
   cancelJob(job: { kind: string; run_id: string; fork_id: string; workflow_name: string; step_name: string }) {

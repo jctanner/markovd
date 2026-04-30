@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import type { ActiveJob, ConcurrencyBucket } from '../api';
+import type { ActiveJob, ConcurrencyBucket, DurationBucket } from '../api';
 
 function badgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -80,6 +80,62 @@ function ConcurrencyChart({ buckets }: { buckets: ConcurrencyBucket[] }) {
                 <div
                   className={`concurrency-chart-bar${b.count > 0 ? ' active' : ''}`}
                   style={{ height: `${(b.count / max) * 100}%` }}
+                />
+                {i % labelInterval === 0 && (
+                  <span className="concurrency-chart-xlabel">{formatTime(b.t)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
+  return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+function DurationChart({ buckets }: { buckets: DurationBucket[] }) {
+  if (buckets.length === 0) return null;
+
+  const max = Math.max(...buckets.map((b) => b.avg_seconds), 1);
+  const tickCount = Math.min(4, Math.ceil(max));
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => (max / tickCount) * i);
+
+  const labelInterval = Math.max(1, Math.floor(buckets.length / 8));
+
+  return (
+    <div className="concurrency-chart">
+      <div className="concurrency-chart-header">
+        <span className="concurrency-chart-title">Job Duration (24h)</span>
+        <span className="concurrency-chart-subtitle">avg per 15-min bucket</span>
+      </div>
+      <div className="concurrency-chart-body">
+        <div className="concurrency-chart-yaxis">
+          {[...ticks].reverse().map((t, i) => (
+            <span key={i} className="concurrency-chart-ylabel">{formatDuration(t)}</span>
+          ))}
+        </div>
+        <div className="concurrency-chart-area">
+          <div className="concurrency-chart-grid">
+            {ticks.map((t, i) => (
+              <div key={i} className="concurrency-chart-gridline" style={{ bottom: `${(t / max) * 100}%` }} />
+            ))}
+          </div>
+          <div className="concurrency-chart-bars">
+            {buckets.map((b, i) => (
+              <div
+                key={b.t}
+                className="concurrency-chart-col"
+                title={b.count > 0 ? `${formatTime(b.t)}: avg ${formatDuration(b.avg_seconds)}, max ${formatDuration(b.max_seconds)} (${b.count} jobs)` : `${formatTime(b.t)}: no completions`}
+              >
+                <div
+                  className={`concurrency-chart-bar${b.count > 0 ? ' duration' : ''}`}
+                  style={{ height: `${(b.avg_seconds / max) * 100}%` }}
                 />
                 {i % labelInterval === 0 && (
                   <span className="concurrency-chart-xlabel">{formatTime(b.t)}</span>
@@ -224,6 +280,7 @@ function JobLogModal({ job, onClose }: { job: ActiveJob; onClose: () => void }) 
 export default function Jobs() {
   const [jobs, setJobs] = useState<ActiveJob[]>([]);
   const [buckets, setBuckets] = useState<ConcurrencyBucket[]>([]);
+  const [durationBuckets, setDurationBuckets] = useState<DurationBucket[]>([]);
   const [error, setError] = useState('');
   const [selectedJob, setSelectedJob] = useState<ActiveJob | null>(null);
 
@@ -234,9 +291,11 @@ export default function Jobs() {
   useEffect(() => {
     loadJobs();
     api.getConcurrencyHistory().then(setBuckets).catch(() => {});
+    api.getDurationHistory().then(setDurationBuckets).catch(() => {});
     const interval = setInterval(loadJobs, 5000);
     const chartInterval = setInterval(() => {
       api.getConcurrencyHistory().then(setBuckets).catch(() => {});
+      api.getDurationHistory().then(setDurationBuckets).catch(() => {});
     }, 30000);
     return () => { clearInterval(interval); clearInterval(chartInterval); };
   }, []);
@@ -267,6 +326,7 @@ export default function Jobs() {
       </div>
       {error && <div className="msg-error">{error}</div>}
       <ConcurrencyChart buckets={buckets} />
+      <DurationChart buckets={durationBuckets} />
       <div className="table-wrap">
         <table>
           <thead>

@@ -206,6 +206,19 @@ func (s *Server) handleConcurrencyHistory(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, buckets)
 }
 
+func (s *Server) handleDurationHistory(w http.ResponseWriter, r *http.Request) {
+	buckets, err := s.db.GetDurationHistory(r.Context())
+	if err != nil {
+		log.Printf("failed to get duration history: %v", err)
+		writeJSON(w, http.StatusOK, []models.DurationBucket{})
+		return
+	}
+	if buckets == nil {
+		buckets = []models.DurationBucket{}
+	}
+	writeJSON(w, http.StatusOK, buckets)
+}
+
 func (s *Server) handleGetJobLogs(w http.ResponseWriter, r *http.Request) {
 	jobName := chi.URLParam(r, "name")
 	if jobName == "" {

@@ -992,6 +992,11 @@ td.cell-link a:hover {
   opacity: 0.8;
 }
 
+.concurrency-chart-bar.duration {
+  background: var(--status-running);
+  opacity: 0.8;
+}
+
 .concurrency-chart-xlabel {
   position: absolute;
   bottom: -16px;

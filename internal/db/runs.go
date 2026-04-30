@@ -179,6 +179,56 @@ func (d *DB) GetConcurrencyHistory(ctx context.Context) ([]models.ConcurrencyBuc
 	return buckets, rows.Err()
 }
 
+func (d *DB) GetDurationHistory(ctx context.Context) ([]models.DurationBucket, error) {
+	rows, err := d.QueryContext(ctx,
+		`WITH buckets AS (
+			SELECT generate_series(
+				date_trunc('minute', now() - interval '24 hours'),
+				now(),
+				interval '15 minutes'
+			) AS t
+		),
+		jobs AS (
+			SELECT started_at, completed_at,
+			       EXTRACT(EPOCH FROM (completed_at - started_at)) AS dur_secs
+			FROM runs
+			WHERE completed_at IS NOT NULL
+			  AND started_at IS NOT NULL
+			  AND completed_at > now() - interval '25 hours'
+			UNION ALL
+			SELECT started_at, completed_at,
+			       EXTRACT(EPOCH FROM (completed_at - started_at)) AS dur_secs
+			FROM steps
+			WHERE completed_at IS NOT NULL
+			  AND started_at IS NOT NULL
+			  AND completed_at > now() - interval '25 hours'
+			  AND COALESCE(output_json::jsonb->>'job_name', '') != ''
+		)
+		SELECT b.t,
+		       COALESCE(AVG(j.dur_secs), 0),
+		       COALESCE(MAX(j.dur_secs), 0),
+		       COUNT(j.dur_secs)
+		FROM buckets b
+		LEFT JOIN jobs j ON j.completed_at >= b.t
+		  AND j.completed_at < b.t + interval '15 minutes'
+		GROUP BY b.t
+		ORDER BY b.t`)
+	if err != nil {
+		return nil, fmt.Errorf("duration history: %w", err)
+	}
+	defer rows.Close()
+
+	var buckets []models.DurationBucket
+	for rows.Next() {
+		var b models.DurationBucket
+		if err := rows.Scan(&b.T, &b.AvgSeconds, &b.MaxSeconds, &b.Count); err != nil {
+			return nil, fmt.Errorf("scanning duration bucket: %w", err)
+		}
+		buckets = append(buckets, b)
+	}
+	return buckets, rows.Err()
+}
+
 func (d *DB) UpsertRunFromEvent(ctx context.Context, runID, workflowName, status string, startedAt, completedAt *time.Time) error {
 	_, err := d.ExecContext(ctx,
 		`INSERT INTO runs (run_id, workflow_name, status, started_at, completed_at)

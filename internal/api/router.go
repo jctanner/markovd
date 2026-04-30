@@ -75,6 +75,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/jobs/active", s.handleActiveJobs)
 			r.Get("/jobs/list", s.handleListActiveJobs)
 			r.Get("/jobs/concurrency", s.handleConcurrencyHistory)
+			r.Get("/jobs/durations", s.handleDurationHistory)
 			r.Post("/jobs/cancel", s.handleCancelJob)
 			r.Get("/jobs/{name}/logs", s.handleGetJobLogs)
 			r.Get("/jobs/{name}/logs/stream", s.handleStreamJobLogs)
