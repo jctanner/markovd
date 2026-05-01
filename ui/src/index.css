@@ -893,6 +893,18 @@ td.cell-link a:hover {
 
 /* ===== CONCURRENCY CHART ===== */
 
+.chart-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.chart-row > .concurrency-chart {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 .concurrency-chart {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

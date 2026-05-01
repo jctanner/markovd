@@ -325,8 +325,10 @@ export default function Jobs() {
         <h1 className="page-title">Active Jobs</h1>
       </div>
       {error && <div className="msg-error">{error}</div>}
-      <ConcurrencyChart buckets={buckets} />
-      <DurationChart buckets={durationBuckets} />
+      <div className="chart-row">
+        <ConcurrencyChart buckets={buckets} />
+        <DurationChart buckets={durationBuckets} />
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
