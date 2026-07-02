@@ -6,7 +6,13 @@ bugs, decisions, and operational notes live under `docs/`.
 ## Overview
 
 - [Project overview](docs/plans/000-overview.md)
+- [Workflow input formats plan](docs/plans/001-workflow-input-formats.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
+- [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
+
+## Milestones
+
+- [M1: Workflow Input Formats](docs/milestones/M1-workflow-input-formats.md)
 
 ## Active Tasks
 
@@ -14,7 +20,13 @@ No task files are currently in `docs/tasks/current/`.
 
 ## Pending Tasks
 
-No task files are currently in `docs/tasks/pending/`.
+- [Define workflow definition model](docs/tasks/pending/workflow-definition-model.md)
+- [Materialize and validate workflow definitions](docs/tasks/pending/workflow-definition-validation.md)
+- [Run directory workflows from shell and Kubernetes runners](docs/tasks/pending/workflow-definition-runners.md)
+- [Import directory workflows from projects](docs/tasks/pending/workflow-definition-project-import.md)
+- [Update workflow API and UI for file and directory definitions](docs/tasks/pending/workflow-definition-api-ux.md)
+- [Support diagrams for directory workflow definitions](docs/tasks/pending/workflow-definition-diagrams.md)
+- [Verify workflow definition formats end to end](docs/tasks/pending/workflow-definition-e2e-verification.md)
 
 ## Open Bugs
 

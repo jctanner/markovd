@@ -13,3 +13,25 @@ Completed:
 
 Next:
 - Convert future work into task files under `docs/tasks/pending/`.
+
+## 2026-07-02
+
+Agent: codex
+
+Completed:
+- Analyzed markovd assumptions around single self-contained workflow YAML files.
+- Added a plan for supporting both single-file and directory workflow definitions.
+- Added ADR-0002 for the file/directory workflow definition decision.
+- Added a milestone and pending task files for persistence, validation, runners,
+  project import, API/UX, and diagrams.
+- Added the compose verification prerequisite to refresh `./bin/markov` from
+  `../markov/bin/markov` before stack startup.
+- Expanded the plan with testing strategy, migration/rollback details, validation
+  endpoint design, and a dedicated end-to-end verification task.
+
+Discovered:
+- Workflow storage, project import, runner materialization, diagram generation,
+  and the UI all currently assume a single YAML string.
+
+Next:
+- Start with `docs/tasks/pending/workflow-definition-model.md`.
