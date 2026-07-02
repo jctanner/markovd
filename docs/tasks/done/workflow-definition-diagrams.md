@@ -12,14 +12,14 @@ with a top-level `workflows` list.
 
 ## Acceptance Criteria
 
-- [ ] Add diagram generation from `WorkflowDefinition`.
-- [ ] Preserve existing diagrams for single-file workflows.
-- [ ] Support directory definitions by resolving/merging the directory files into
+- [x] Add diagram generation from `WorkflowDefinition`.
+- [x] Preserve existing diagrams for single-file workflows.
+- [x] Support directory definitions by resolving/merging the directory files into
       the diagram schema or by delegating to Markov.
-- [ ] Return useful errors for invalid definitions instead of a generic internal
+- [x] Return useful errors for invalid definitions instead of a generic internal
       error.
-- [ ] Add tests for file and directory diagram generation.
-- [ ] Confirm diagram generation uses the same path validation and
+- [x] Add tests for file and directory diagram generation.
+- [x] Confirm diagram generation uses the same path validation and
       materialization helper as validation and runners.
 
 ## Files Likely Involved
@@ -30,7 +30,7 @@ with a top-level `workflows` list.
 
 ## Status
 
-Pending
+Done
 
 ## Notes
 

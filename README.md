@@ -21,6 +21,7 @@ markovd provides an HTTP API and React UI on top of markov, letting users trigge
 ## Features
 
 - **Run management** — trigger, list, and inspect workflow runs
+- **Workflow input formats** — upload or import either single-file workflows or Markov directory workflow projects
 - **Callback event receiver** — ingests real-time step lifecycle events from markov's HTTP callback system
 - **Sub-workflow visibility** — full execution tree for fan-out (`for_each`), recursive, and nested sub-workflows
 - **Workflow graph** — React Flow DAG visualization with status-colored nodes and step type icons
@@ -70,8 +71,8 @@ in [AGENTS.md](AGENTS.md).
 
 When a run is triggered via the API, markovd:
 
-1. Writes the workflow YAML to a temp file
-2. Starts `markov run` as a subprocess with `--callback http://api:8080/api/v1/events`
+1. Materializes the workflow definition as either a temp YAML file or temp directory
+2. Starts `markov run <file-or-directory>` as a subprocess with `--callback http://api:8080/api/v1/events`
 3. markov POSTs step lifecycle events (`step_started`, `step_completed`, `gate_evaluated`, etc.) back to markovd
 4. markovd upserts run/step state in PostgreSQL
 5. The React UI polls the API and renders the execution graph, Gantt chart, or step table
@@ -97,7 +98,8 @@ All under `/api/v1/`, JWT-protected except login/register and the event receiver
 | POST   | `/runs`                | Trigger a new run              |
 | GET    | `/workflows`           | List workflows                 |
 | GET    | `/workflows/:name`     | Get workflow by name           |
-| POST   | `/workflows`           | Upload workflow YAML           |
+| POST   | `/workflows`           | Upload a workflow file or directory definition |
+| POST   | `/workflows/validate`  | Validate a workflow definition |
 | POST   | `/events`              | Callback event receiver        |
 
 ## Configuration
@@ -112,6 +114,10 @@ Environment variables (with defaults):
 | `MARKOVD_MARKOV_BIN`    | `markov`                         | Path to markov binary               |
 | `MARKOVD_CALLBACK_TOKEN`| *(empty)*                        | Shared token for callback auth      |
 | `MARKOVD_CALLBACK_URL`  | `http://localhost:PORT/api/v1/events` | URL markov posts callbacks to |
+
+Workflow uploads support the legacy `{ "name": "...", "yaml": "..." }` payload
+for single-file workflows and `{ "name": "...", "definition_kind": "directory",
+"files": [...] }` for directory workflows.
 
 ## Make targets
 

@@ -12,16 +12,16 @@ on the workflow detail page.
 
 ## Acceptance Criteria
 
-- [ ] Extend API request/response types with `definition_kind` and `files`.
-- [ ] Keep legacy `{ name, yaml }` create/update payloads working.
-- [ ] Add API client support for `POST /api/v1/workflows/validate`.
-- [ ] Add workflow type badges to the Workflows list.
-- [ ] Add a manual upload mode switch for single file vs directory.
-- [ ] Add a directory file editor/viewer with relative paths.
-- [ ] Show server validation errors in upload/edit forms.
-- [ ] Update Project import UI labels from "Workflow Files" to "Workflow Definitions".
-- [ ] Show workflow type/source on Trigger Run and Rerun surfaces.
-- [ ] End-to-end UI verification runs against a compose stack started after
+- [x] Extend API request/response types with `definition_kind` and `files`.
+- [x] Keep legacy `{ name, yaml }` create/update payloads working.
+- [x] Add API client support for `POST /api/v1/workflows/validate`.
+- [x] Add workflow type badges to the Workflows list.
+- [x] Add a manual upload mode switch for single file vs directory.
+- [x] Add a directory file editor/viewer with relative paths.
+- [x] Show server validation errors in upload/edit forms.
+- [x] Update Project import UI labels from "Workflow Files" to "Workflow Definitions".
+- [x] Show workflow type/source on Trigger Run and Rerun surfaces.
+- [x] End-to-end UI verification runs against a compose stack started after
       copying `../markov/bin/markov` to `./bin/markov`.
 
 ## Files Likely Involved
@@ -37,7 +37,7 @@ on the workflow detail page.
 
 ## Status
 
-Pending
+Done
 
 ## Notes
 

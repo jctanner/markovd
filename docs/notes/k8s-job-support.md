@@ -10,7 +10,7 @@ The chain looks like:
 
 ```
 markovd (SA: markovd)
-  └─ creates K8s Job running "markov run workflow.yaml" (SA: pipeline-agent)
+  └─ creates K8s Job running "markov run <workflow-file-or-directory>" (SA: pipeline-agent)
        └─ markov's k8s_job executor creates child Jobs (SA: pipeline-agent)
             └─ child jobs inherit SA from pod spec
 ```
@@ -37,14 +37,14 @@ Add `MARKOVD_RUNNER` env var in `cmd/markovd/main.go`:
 
 ### Start()
 
-1. Create a ConfigMap containing the workflow YAML from `req.WorkflowYAML`
+1. Create a ConfigMap containing the workflow definition files from `req.Workflow`
 2. Create a `batch/v1.Job` with:
    - **Image**: configurable via `MARKOVD_MARKOV_IMAGE` (e.g., `ghcr.io/jctanner/markov:latest`)
-   - **Command**: `["markov", "run", "/etc/markov/workflow.yaml"]`
+   - **Command**: `["markov", "run", "/etc/markov/workflow.yaml"]` for single-file workflows, or `["markov", "run", "/etc/markov/workflow"]` for directory workflows
    - **ServiceAccountName**: `pipeline-agent` (configurable via `MARKOVD_JOB_SERVICE_ACCOUNT`)
    - **Namespace**: configurable via `MARKOVD_JOB_NAMESPACE` (default: same namespace as markovd)
    - **Volumes**:
-     - ConfigMap with workflow YAML mounted at `/etc/markov/workflow.yaml`
+     - ConfigMap with workflow YAML mounted at `/etc/markov/workflow.yaml`, or directory workflow files mounted under `/etc/markov/workflow`
      - Any shared PVCs (issues, workspace, artifacts) if configured
    - **Env vars**:
      - `req.Vars` as individual env vars (prefixed, e.g., `MARKOV_VAR_key=value`), or passed as `--var key=value` args

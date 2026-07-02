@@ -13,17 +13,17 @@ from the engine's schema.
 
 ## Acceptance Criteria
 
-- [ ] Reject absolute paths, empty paths, and paths that escape the workflow root.
-- [ ] Validate file definitions contain exactly one YAML file.
-- [ ] Validate directory definitions contain Markov's required category files and
+- [x] Reject absolute paths, empty paths, and paths that escape the workflow root.
+- [x] Validate file definitions contain exactly one YAML file.
+- [x] Validate directory definitions contain Markov's required category files and
       at least one `workflows/*.yaml` file.
-- [ ] Materialize definitions to a temp file or directory.
-- [ ] Add `POST /api/v1/workflows/validate` for UI preflight validation.
-- [ ] Run `markov validate <path>` before create, update, import, and run.
-- [ ] Return validation errors to API clients with actionable messages.
-- [ ] Add unit tests for valid definitions, missing required files, duplicate or
+- [x] Materialize definitions to a temp file or directory.
+- [x] Add `POST /api/v1/workflows/validate` for UI preflight validation.
+- [x] Run `markov validate <path>` before create, update, import, and run.
+- [x] Return validation errors to API clients with actionable messages.
+- [x] Add unit tests for valid definitions, missing required files, duplicate or
       unsafe paths, and malformed YAML.
-- [ ] For compose verification, copy `../markov/bin/markov` to `./bin/markov`
+- [x] For compose verification, copy `../markov/bin/markov` to `./bin/markov`
       before starting the stack so server-side validation uses the new Markov
       binary.
 
@@ -36,7 +36,7 @@ from the engine's schema.
 
 ## Status
 
-Pending
+Done
 
 ## Notes
 

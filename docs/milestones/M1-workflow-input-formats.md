@@ -11,13 +11,13 @@ Decision record: [ADR-0002: Support File and Directory Workflow Definitions](../
 
 ## Tasks
 
-- [Define workflow definition model](../tasks/pending/workflow-definition-model.md)
-- [Materialize and validate workflow definitions](../tasks/pending/workflow-definition-validation.md)
-- [Run directory workflows from shell and Kubernetes runners](../tasks/pending/workflow-definition-runners.md)
-- [Import directory workflows from projects](../tasks/pending/workflow-definition-project-import.md)
-- [Update workflow API and UI for file and directory definitions](../tasks/pending/workflow-definition-api-ux.md)
-- [Support diagrams for directory workflow definitions](../tasks/pending/workflow-definition-diagrams.md)
-- [Verify workflow definition formats end to end](../tasks/pending/workflow-definition-e2e-verification.md)
+- [Define workflow definition model](../tasks/done/workflow-definition-model.md)
+- [Materialize and validate workflow definitions](../tasks/done/workflow-definition-validation.md)
+- [Run directory workflows from shell and Kubernetes runners](../tasks/done/workflow-definition-runners.md)
+- [Import directory workflows from projects](../tasks/done/workflow-definition-project-import.md)
+- [Update workflow API and UI for file and directory definitions](../tasks/done/workflow-definition-api-ux.md)
+- [Support diagrams for directory workflow definitions](../tasks/done/workflow-definition-diagrams.md)
+- [Verify workflow definition formats end to end](../tasks/done/workflow-definition-e2e-verification.md)
 
 ## Success Criteria
 

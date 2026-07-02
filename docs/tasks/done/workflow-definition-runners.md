@@ -12,17 +12,17 @@ key named `workflow.yaml` and runs `/etc/markov/workflow.yaml`.
 
 ## Acceptance Criteria
 
-- [ ] Change `runner.RunRequest` to carry a workflow definition instead of only
+- [x] Change `runner.RunRequest` to carry a workflow definition instead of only
       `WorkflowYAML`.
-- [ ] Shell runner writes a temp file for file workflows and a temp directory for
+- [x] Shell runner writes a temp file for file workflows and a temp directory for
       directory workflows.
-- [ ] Kubernetes runner mounts a file workflow at the existing path.
-- [ ] Kubernetes runner mounts a directory workflow at `/etc/markov/workflow` and
+- [x] Kubernetes runner mounts a file workflow at the existing path.
+- [x] Kubernetes runner mounts a directory workflow at `/etc/markov/workflow` and
       runs `markov run /etc/markov/workflow`.
-- [ ] ConfigMap key/path handling preserves nested relative paths safely.
-- [ ] Existing runner tests continue to cover single-file behavior.
-- [ ] Add runner tests for directory ConfigMap materialization and command args.
-- [ ] Before compose-based runner testing, copy `../markov/bin/markov` to
+- [x] ConfigMap key/path handling preserves nested relative paths safely.
+- [x] Existing runner tests continue to cover single-file behavior.
+- [x] Add runner tests for directory ConfigMap materialization and command args.
+- [x] Before compose-based runner testing, copy `../markov/bin/markov` to
       `./bin/markov`, rebuild/start the stack, and record the command and run
       IDs used for single-file and directory workflow verification.
 
@@ -36,7 +36,7 @@ key named `workflow.yaml` and runs `/etc/markov/workflow.yaml`.
 
 ## Status
 
-Pending
+Done
 
 ## Notes
 

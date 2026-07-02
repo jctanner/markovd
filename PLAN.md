@@ -16,17 +16,21 @@ bugs, decisions, and operational notes live under `docs/`.
 
 ## Active Tasks
 
-No task files are currently in `docs/tasks/current/`.
+None.
 
 ## Pending Tasks
 
-- [Define workflow definition model](docs/tasks/pending/workflow-definition-model.md)
-- [Materialize and validate workflow definitions](docs/tasks/pending/workflow-definition-validation.md)
-- [Run directory workflows from shell and Kubernetes runners](docs/tasks/pending/workflow-definition-runners.md)
-- [Import directory workflows from projects](docs/tasks/pending/workflow-definition-project-import.md)
-- [Update workflow API and UI for file and directory definitions](docs/tasks/pending/workflow-definition-api-ux.md)
-- [Support diagrams for directory workflow definitions](docs/tasks/pending/workflow-definition-diagrams.md)
-- [Verify workflow definition formats end to end](docs/tasks/pending/workflow-definition-e2e-verification.md)
+None.
+
+## Done Tasks
+
+- [Define workflow definition model](docs/tasks/done/workflow-definition-model.md)
+- [Materialize and validate workflow definitions](docs/tasks/done/workflow-definition-validation.md)
+- [Run directory workflows from shell and Kubernetes runners](docs/tasks/done/workflow-definition-runners.md)
+- [Import directory workflows from projects](docs/tasks/done/workflow-definition-project-import.md)
+- [Update workflow API and UI for file and directory definitions](docs/tasks/done/workflow-definition-api-ux.md)
+- [Support diagrams for directory workflow definitions](docs/tasks/done/workflow-definition-diagrams.md)
+- [Verify workflow definition formats end to end](docs/tasks/done/workflow-definition-e2e-verification.md)
 
 ## Open Bugs
 

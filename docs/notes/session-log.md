@@ -34,4 +34,42 @@ Discovered:
   and the UI all currently assume a single YAML string.
 
 Next:
-- Start with `docs/tasks/pending/workflow-definition-model.md`.
+- Start with the workflow definition model task. This task later moved to
+  `docs/tasks/done/workflow-definition-model.md`.
+
+## 2026-07-02
+
+Agent: codex
+
+Completed:
+- Implemented workflow definitions with `file` and `directory` kinds across
+  persistence, API, runners, project import, diagrams, and UI.
+- Added path-safe workflow definition normalization and materialization helpers.
+- Added validation endpoint `POST /api/v1/workflows/validate`.
+- Updated shell runner lifecycle so workflow runs outlive the create-run request
+  context and complete through callbacks.
+- Added runtime `git` to the API image so local project repository sync works.
+
+Verified:
+- `go test ./...`
+- `npm run build`
+- `cp ../markov/bin/markov ./bin/markov`
+- `./bin/markov validate ../markov/examples/dir-based-hello-world`
+- `./bin/markov validate ../markov/examples/k8s-job-test.yaml`
+- `uv tool run podman-compose build`
+- `uv tool run podman-compose up -d --force-recreate api`
+- API health returned `{"status":"healthy"}`.
+- Single-file workflow `single-file-smoke` validated, diagrammed, ran as
+  `markov-run-43cea868`, and completed.
+- Manual directory workflow `directory-smoke` validated, diagrammed, ran as
+  `markov-run-20926252`, and completed.
+- Invalid directory workflow validation failed before storage with missing
+  `vars.yaml`.
+- Project directory workflow `pipeline` imported from project `1`, diagrammed,
+  ran as `markov-run-6b9c3df9`, and completed.
+- Project re-sync updated `pipeline` from `project-directory-v1` to
+  `project-directory-v2`; re-run `markov-run-6b6cdbd7` completed with stdout
+  `project-directory-v2`.
+
+Next:
+- Commit the implementation.
