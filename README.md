@@ -47,6 +47,12 @@ open http://localhost:5173
 
 Log in with username `admin` and the password from `make admin-password`.
 
+## Project state
+
+Project planning, active work, bug tracking, decisions, and agent handoff notes
+are indexed from [PLAN.md](PLAN.md). Repository-specific agent instructions live
+in [AGENTS.md](AGENTS.md).
+
 ## Architecture
 
 ```
@@ -140,6 +146,7 @@ markovd/
 │       ├── auth.tsx      Auth context + protected routes
 │       ├── theme.ts      Dark/light theme hook
 │       └── index.css     Design system (CSS custom properties)
+├── docs/                 Plans, tasks, bugs, decisions, and notes
 ├── Dockerfile            Multi-stage build (Go API + React static assets)
 ├── podman-compose.yml    Full stack: PostgreSQL, API, UI dev server
 └── Makefile
