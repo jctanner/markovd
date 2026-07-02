@@ -45,6 +45,7 @@ None.
 - [Configurable Kubernetes job image pull policy](docs/bugs/fixed/runner-bug-2-imagepullpolicy.md)
 - [Run ID mismatch between markovd and markov](docs/bugs/fixed/runner-bug-4-run-id-mismatch.md)
 - [`rootRunID()` truncates `markov-run-*` IDs](docs/bugs/fixed/runner-bug-5-rootrunid-truncation.md)
+- [Kubernetes directory workflows mount files at the wrong path](docs/bugs/fixed/runner-bug-7-directory-workflow-k8s-mount.md)
 
 ## Operational Notes
 
