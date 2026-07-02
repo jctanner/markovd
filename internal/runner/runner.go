@@ -4,6 +4,9 @@ import (
 	"context"
 	"io"
 	"strings"
+
+	"github.com/jctanner/markovd/internal/models"
+	"github.com/jctanner/markovd/internal/workflowdef"
 )
 
 type PVCMount struct {
@@ -22,12 +25,20 @@ type SecretMount struct {
 
 type RunRequest struct {
 	WorkflowYAML  string
+	Workflow      models.WorkflowDefinition
 	Vars          map[string]string
 	CallbackURL   string
 	CallbackToken string
 	Debug         bool
 	Volumes       []PVCMount
 	SecretVolumes []SecretMount
+}
+
+func (r RunRequest) WorkflowDefinition() models.WorkflowDefinition {
+	if len(r.Workflow.Files) > 0 {
+		return r.Workflow
+	}
+	return workflowdef.FromLegacyYAML(r.WorkflowYAML)
 }
 
 type PVCInfo struct {

@@ -1832,6 +1832,35 @@ td.cell-link a:hover {
   accent-color: var(--accent);
 }
 
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.tab-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-hover);
+}
+
+.definition-editor {
+  display: grid;
+  gap: 10px;
+}
+
 .source-badge {
   display: inline-flex;
   align-items: center;

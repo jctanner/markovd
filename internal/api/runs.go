@@ -123,6 +123,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 
 	runReq := runner.RunRequest{
 		WorkflowYAML:  wf.YAML,
+		Workflow:      models.WorkflowDefinition{Kind: wf.DefinitionKind, Files: wf.Files},
 		Vars:          req.Vars,
 		CallbackURL:   s.callbackURL,
 		CallbackToken: s.callbackToken,

@@ -19,17 +19,19 @@ type Server struct {
 	auth          auth.Provider
 	jwt           *auth.JWTManager
 	runner        runner.Runner
+	markovBin     string
 	callbackToken string
 	callbackURL   string
 	projectsDir   string
 }
 
-func NewServer(database *db.DB, authProvider auth.Provider, jwtMgr *auth.JWTManager, r runner.Runner, callbackToken, callbackURL, projectsDir string) *Server {
+func NewServer(database *db.DB, authProvider auth.Provider, jwtMgr *auth.JWTManager, r runner.Runner, markovBin, callbackToken, callbackURL, projectsDir string) *Server {
 	return &Server{
 		db:            database,
 		auth:          authProvider,
 		jwt:           jwtMgr,
 		runner:        r,
+		markovBin:     markovBin,
 		callbackToken: callbackToken,
 		callbackURL:   callbackURL,
 		projectsDir:   projectsDir,
@@ -81,6 +83,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/jobs/{name}/logs/stream", s.handleStreamJobLogs)
 
 			r.Get("/workflows", s.handleListWorkflows)
+			r.Post("/workflows/validate", s.handleValidateWorkflow)
 			r.Get("/workflows/{name}", s.handleGetWorkflow)
 			r.Get("/workflows/{name}/diagram", s.handleWorkflowDiagram)
 			r.Post("/workflows", s.handleCreateWorkflow)

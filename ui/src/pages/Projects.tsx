@@ -127,7 +127,10 @@ export default function Projects() {
     setSuccess('');
     setImporting(true);
     try {
-      const results = await api.importProjectFiles(selected.id, Array.from(selectedFiles));
+      const definitions = files
+        .filter(f => selectedFiles.has(f.path))
+        .map(f => ({ path: f.path, kind: f.kind }));
+      const results = await api.importProjectDefinitions(selected.id, definitions);
       const errors = results.filter(r => r.error);
       if (errors.length > 0) {
         setError(`Failed to import: ${errors.map(e => e.path).join(', ')}`);
@@ -214,7 +217,7 @@ export default function Projects() {
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="section-heading" style={{ margin: 0 }}>
-              {selected.name} — Workflow Files
+              {selected.name} — Workflow Definitions
             </div>
             <button
               className="btn btn-primary btn-sm"
@@ -225,7 +228,7 @@ export default function Projects() {
             </button>
           </div>
           {files.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>No YAML files found in repository.</p>
+            <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>No workflow definitions found in repository.</p>
           ) : (
             <ul className="file-tree">
               {files.map((f) => (
@@ -237,6 +240,7 @@ export default function Projects() {
                     onChange={() => toggleFile(f.path)}
                   />
                   <span>{f.path}</span>
+                  <span className="source-badge source-badge-manual">{f.kind === 'directory' ? 'directory' : 'file'}</span>
                   {f.imported && <span className="source-badge source-badge-project">imported</span>}
                 </li>
               ))}

@@ -2,13 +2,24 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Workflow } from '../api';
+import type { Workflow, WorkflowDefinitionFile } from '../api';
+
+const defaultDirectoryFiles: WorkflowDefinitionFile[] = [
+  { path: 'meta.yaml', content: 'entrypoint: main\nforks: 2\n' },
+  { path: 'vars.yaml', content: '{}\n' },
+  { path: 'rules.yaml', content: '[]\n' },
+  { path: 'step_types.yaml', content: '{}\n' },
+  { path: 'workflows/main.yaml', content: 'name: main\nsteps: []\n' },
+];
 
 export default function Workflows() {
   const navigate = useNavigate();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
+  const [definitionKind, setDefinitionKind] = useState<'file' | 'directory'>('file');
+  const [files, setFiles] = useState<WorkflowDefinitionFile[]>(defaultDirectoryFiles);
+  const [selectedFile, setSelectedFile] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showUpload, setShowUpload] = useState(false);
@@ -28,15 +39,36 @@ export default function Workflows() {
     setError('');
     setSuccess('');
     try {
-      await api.createWorkflow(name, yaml);
+      if (definitionKind === 'file') {
+        await api.createWorkflow(name, yaml);
+      } else {
+        await api.createWorkflowDefinition(name, 'directory', files);
+      }
       setSuccess(`Workflow "${name}" uploaded.`);
       setName('');
       setYaml('');
+      setFiles(defaultDirectoryFiles);
+      setSelectedFile(0);
+      setDefinitionKind('file');
       setShowUpload(false);
       loadWorkflows();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload workflow');
     }
+  };
+
+  const updateFile = (idx: number, field: 'path' | 'content', value: string) => {
+    setFiles(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f));
+  };
+
+  const addFile = () => {
+    setFiles(prev => [...prev, { path: `workflows/file-${prev.length}.yaml`, content: 'name: new_workflow\nsteps: []\n' }]);
+    setSelectedFile(files.length);
+  };
+
+  const removeFile = (idx: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+    setSelectedFile(0);
   };
 
   const handleDelete = async (wf: Workflow) => {
@@ -67,6 +99,7 @@ export default function Workflows() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Type</th>
               <th>Source</th>
               <th>Updated</th>
               <th>Actions</th>
@@ -80,6 +113,11 @@ export default function Workflows() {
                 onClick={() => navigate(`/workflows/${encodeURIComponent(wf.name)}`)}
               >
                 <td className="cell-mono">{wf.name}</td>
+                <td>
+                  <span className="source-badge source-badge-manual">
+                    {wf.definition_kind === 'directory' ? 'Directory' : 'File'}
+                  </span>
+                </td>
                 <td>
                   {wf.project_id
                     ? <span className="source-badge source-badge-project">Project</span>
@@ -101,7 +139,7 @@ export default function Workflows() {
             ))}
             {workflows.length === 0 && (
               <tr>
-                <td colSpan={4} className="table-empty">
+                <td colSpan={5} className="table-empty">
                   No workflows uploaded yet.
                 </td>
               </tr>
@@ -133,14 +171,68 @@ export default function Workflows() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">YAML Definition</label>
-                  <textarea
-                    className="form-textarea"
-                    value={yaml}
-                    onChange={(e) => setYaml(e.target.value)}
-                    placeholder="name: my-workflow&#10;steps:&#10;  - name: step-1&#10;    shell: echo hello"
-                    required
-                    rows={14}
-                  />
+                  <div className="tabs" style={{ marginBottom: 8 }}>
+                    <button
+                      type="button"
+                      className={`tab-btn${definitionKind === 'file' ? ' active' : ''}`}
+                      onClick={() => setDefinitionKind('file')}
+                    >
+                      Single file
+                    </button>
+                    <button
+                      type="button"
+                      className={`tab-btn${definitionKind === 'directory' ? ' active' : ''}`}
+                      onClick={() => setDefinitionKind('directory')}
+                    >
+                      Directory
+                    </button>
+                  </div>
+                  {definitionKind === 'file' ? (
+                    <textarea
+                      className="form-textarea"
+                      value={yaml}
+                      onChange={(e) => setYaml(e.target.value)}
+                      placeholder="entrypoint: main&#10;workflows:&#10;  - name: main&#10;    steps: []"
+                      required
+                      rows={14}
+                    />
+                  ) : (
+                    <div className="definition-editor">
+                      <div className="file-tree">
+                        {files.map((f, idx) => (
+                          <div key={`${f.path}-${idx}`} className={`file-tree-item${selectedFile === idx ? ' imported' : ''}`}>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedFile(idx)}>
+                              {f.path || '(unnamed)'}
+                            </button>
+                            <button type="button" className="btn btn-danger btn-sm" onClick={() => removeFile(idx)}>
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={addFile} style={{ marginBottom: 8 }}>
+                        Add file
+                      </button>
+                      {files[selectedFile] && (
+                        <>
+                          <input
+                            className="form-input"
+                            value={files[selectedFile].path}
+                            onChange={(e) => updateFile(selectedFile, 'path', e.target.value)}
+                            placeholder="workflows/main.yaml"
+                            required
+                          />
+                          <textarea
+                            className="form-textarea"
+                            value={files[selectedFile].content}
+                            onChange={(e) => updateFile(selectedFile, 'content', e.target.value)}
+                            rows={12}
+                            required
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button type="submit" className="btn btn-primary">
                   Upload

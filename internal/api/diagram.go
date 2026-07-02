@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 
+	"github.com/jctanner/markovd/internal/models"
+	"github.com/jctanner/markovd/internal/workflowdef"
 	"gopkg.in/yaml.v3"
 )
 
@@ -106,7 +108,43 @@ func generateDiagramFromYAML(yamlContent string) (*DiagramResponse, error) {
 	if err := yaml.Unmarshal([]byte(yamlContent), &wf); err != nil {
 		return nil, fmt.Errorf("parsing workflow YAML: %w", err)
 	}
+	return generateDiagram(wf)
+}
 
+func generateDiagramFromDefinition(def models.WorkflowDefinition) (*DiagramResponse, error) {
+	def, err := workflowdef.Normalize(def.Kind, def.Files)
+	if err != nil {
+		return nil, err
+	}
+	if def.Kind == workflowdef.KindFile {
+		return generateDiagramFromYAML(def.Files[0].Content)
+	}
+
+	var wf diagramWorkflowFile
+	for _, f := range def.Files {
+		switch f.Path {
+		case "meta.yaml":
+			var meta struct {
+				Entrypoint string `yaml:"entrypoint"`
+			}
+			if err := yaml.Unmarshal([]byte(f.Content), &meta); err != nil {
+				return nil, fmt.Errorf("parsing meta.yaml: %w", err)
+			}
+			wf.Entrypoint = meta.Entrypoint
+		default:
+			if len(f.Path) > len("workflows/") && f.Path[:len("workflows/")] == "workflows/" {
+				var workflow diagramWorkflow
+				if err := yaml.Unmarshal([]byte(f.Content), &workflow); err != nil {
+					return nil, fmt.Errorf("parsing %s: %w", f.Path, err)
+				}
+				wf.Workflows = append(wf.Workflows, workflow)
+			}
+		}
+	}
+	return generateDiagram(wf)
+}
+
+func generateDiagram(wf diagramWorkflowFile) (*DiagramResponse, error) {
 	wfMap := make(map[string]*diagramWorkflow)
 	for i := range wf.Workflows {
 		wfMap[wf.Workflows[i].Name] = &wf.Workflows[i]

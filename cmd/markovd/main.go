@@ -86,7 +86,7 @@ func main() {
 		log.Fatalf("Failed to create projects directory: %v", err)
 	}
 
-	srv := api.NewServer(database, authProvider, jwtMgr, r, callbackToken, callbackURL, projectsDir)
+	srv := api.NewServer(database, authProvider, jwtMgr, r, markovBin, callbackToken, callbackURL, projectsDir)
 
 	log.Printf("Starting markovd on :%s", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), srv.Router()); err != nil {

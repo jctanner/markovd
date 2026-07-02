@@ -10,14 +10,28 @@ type User struct {
 }
 
 type Workflow struct {
-	ID         int       `json:"id"`
-	Name       string    `json:"name"`
-	YAML       string    `json:"yaml"`
-	UploadedBy int       `json:"uploaded_by"`
-	ProjectID  *int      `json:"project_id,omitempty"`
-	SourcePath string    `json:"source_path,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID             int                      `json:"id"`
+	Name           string                   `json:"name"`
+	YAML           string                   `json:"yaml"`
+	DefinitionKind string                   `json:"definition_kind"`
+	Files          []WorkflowDefinitionFile `json:"files"`
+	UploadedBy     int                      `json:"uploaded_by"`
+	ProjectID      *int                     `json:"project_id,omitempty"`
+	SourcePath     string                   `json:"source_path,omitempty"`
+	SourceKind     string                   `json:"source_kind"`
+	SourceRoot     string                   `json:"source_root,omitempty"`
+	CreatedAt      time.Time                `json:"created_at"`
+	UpdatedAt      time.Time                `json:"updated_at"`
+}
+
+type WorkflowDefinitionFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type WorkflowDefinition struct {
+	Kind  string                   `json:"kind"`
+	Files []WorkflowDefinitionFile `json:"files"`
 }
 
 type Project struct {

@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+
+	"github.com/jctanner/markovd/internal/workflowdef"
 )
 
 type ShellRunner struct {
@@ -25,19 +27,13 @@ func NewShellRunner(markovBin string) *ShellRunner {
 }
 
 func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error) {
-	tmpFile, err := os.CreateTemp("", "markov-workflow-*.yaml")
+	m, err := workflowdef.Materialize(req.WorkflowDefinition())
 	if err != nil {
-		return "", fmt.Errorf("creating temp file: %w", err)
+		return "", fmt.Errorf("materializing workflow: %w", err)
 	}
-	if _, err := tmpFile.WriteString(req.WorkflowYAML); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("writing workflow: %w", err)
-	}
-	tmpFile.Close()
 
 	runID := generateRunID()
-	args := []string{"run", tmpFile.Name(), "--verbose", "--run-id", runID}
+	args := []string{"run", m.Path, "--verbose", "--run-id", runID}
 	if req.Debug {
 		args = append(args, "--debug")
 	}
@@ -51,17 +47,17 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 		args = append(args, "--callback-header", fmt.Sprintf("Authorization=Bearer %s", req.CallbackToken))
 	}
 
-	cmd := exec.CommandContext(ctx, r.markovBin, args...)
+	cmd := exec.CommandContext(context.Background(), r.markovBin, args...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		os.Remove(tmpFile.Name())
+		m.Cleanup()
 		return "", fmt.Errorf("creating stdout pipe: %w", err)
 	}
 	cmd.Stderr = cmd.Stdout
 
 	if err := cmd.Start(); err != nil {
-		os.Remove(tmpFile.Name())
+		m.Cleanup()
 		return "", fmt.Errorf("starting markov: %w", err)
 	}
 
@@ -70,7 +66,7 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 	r.mu.Unlock()
 
 	go func() {
-		defer os.Remove(tmpFile.Name())
+		defer m.Cleanup()
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			log.Printf("[markov] %s", scanner.Text())
@@ -112,4 +108,3 @@ func (r *ShellRunner) StreamJobLogs(ctx context.Context, jobName string) (io.Rea
 func (r *ShellRunner) AuditJobStatuses(ctx context.Context) (map[string]string, error) {
 	return nil, nil
 }
-

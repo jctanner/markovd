@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { Run, PVCInfo, SecretInfo } from '../api';
+import type { Run, PVCInfo, SecretInfo, Workflow } from '../api';
 
 interface Props {
   run: Run | null;
@@ -35,6 +35,7 @@ export default function RerunModal({ run, onClose, onConfirm }: Props) {
   const [vars, setVars] = useState<VarRow[]>([]);
   const [pvcs, setPvcs] = useState<PVCInfo[]>([]);
   const [secrets, setSecrets] = useState<SecretInfo[]>([]);
+  const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [selectedPVCs, setSelectedPVCs] = useState<Record<string, string>>({});
   const [selectedSecrets, setSelectedSecrets] = useState<Record<string, string>>({});
 
@@ -51,6 +52,7 @@ export default function RerunModal({ run, onClose, onConfirm }: Props) {
     setSelectedSecrets(parseVolumes(run.secret_volumes_json));
     api.listPVCs().then(setPvcs).catch(() => {});
     api.listSecrets().then(setSecrets).catch(() => {});
+    api.getWorkflow(run.workflow_name).then(setWorkflow).catch(() => setWorkflow(null));
   }, [run]);
 
   if (!run) return null;
@@ -102,6 +104,16 @@ export default function RerunModal({ run, onClose, onConfirm }: Props) {
           <div>
             <div className="modal-title">Re-run</div>
             <div className="rerun-workflow-name">{run.workflow_name}</div>
+            {workflow && (
+              <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                <span className="source-badge source-badge-manual">
+                  {workflow.definition_kind === 'directory' ? 'Directory' : 'File'}
+                </span>
+                <span className={workflow.project_id ? 'source-badge source-badge-project' : 'source-badge source-badge-manual'}>
+                  {workflow.project_id ? 'Project' : 'Manual'}
+                </span>
+              </div>
+            )}
           </div>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>

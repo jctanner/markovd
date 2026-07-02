@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jctanner/markovd/internal/models"
+	"github.com/jctanner/markovd/internal/workflowdef"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,27 +59,30 @@ func NewKubernetesRunner(image, imagePullPolicy, namespace, serviceAccount strin
 func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, error) {
 	runID := generateRunID()
 	cmName := runID + "-workflow"
+	def, err := workflowdef.Normalize(req.WorkflowDefinition().Kind, req.WorkflowDefinition().Files)
+	if err != nil {
+		return "", fmt.Errorf("invalid workflow definition: %w", err)
+	}
+	cmData, cmItems, workflowPath := configMapWorkflowData(def)
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: cmName,
 			Labels: map[string]string{
-				"app":            "markov",
-				"markov/run-id":  runID,
+				"app":           "markov",
+				"markov/run-id": runID,
 			},
 		},
-		Data: map[string]string{
-			"workflow.yaml": req.WorkflowYAML,
-		},
+		Data: cmData,
 	}
 
-	_, err := r.client.CoreV1().ConfigMaps(r.namespace).Create(ctx, cm, metav1.CreateOptions{})
+	_, err = r.client.CoreV1().ConfigMaps(r.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("creating workflow configmap: %w", err)
 	}
 
 	args := []string{
-		"run", "/etc/markov/workflow.yaml", "--verbose",
+		"run", workflowPath, "--verbose",
 		"--run-id", runID,
 		"--namespace", r.namespace,
 	}
@@ -116,6 +121,7 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+					Items:                cmItems,
 				},
 			},
 		},
@@ -213,6 +219,26 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 	}
 
 	return runID, nil
+}
+
+func configMapWorkflowData(def models.WorkflowDefinition) (map[string]string, []corev1.KeyToPath, string) {
+	data := map[string]string{}
+	var items []corev1.KeyToPath
+	workflowPath := "/etc/markov/workflow.yaml"
+	if def.Kind == workflowdef.KindDirectory {
+		workflowPath = "/etc/markov/workflow"
+	}
+	for i, f := range def.Files {
+		key := "workflow.yaml"
+		path := "workflow.yaml"
+		if def.Kind == workflowdef.KindDirectory {
+			key = fmt.Sprintf("f-%03d", i)
+			path = f.Path
+		}
+		data[key] = f.Content
+		items = append(items, corev1.KeyToPath{Key: key, Path: path})
+	}
+	return data, items, workflowPath
 }
 
 func (r *KubernetesRunner) Cancel(runID string) error {

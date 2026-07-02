@@ -15,6 +15,7 @@ export default function TriggerRun() {
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const selectedWorkflowDef = workflows.find(w => w.name === selectedWorkflow);
 
   useEffect(() => {
     api.listWorkflows().then(setWorkflows).catch(() => {});
@@ -122,6 +123,21 @@ export default function TriggerRun() {
                 <option key={wf.name} value={wf.name}>{wf.name}</option>
               ))}
             </select>
+            {selectedWorkflowDef && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="source-badge source-badge-manual">
+                  {selectedWorkflowDef.definition_kind === 'directory' ? 'Directory' : 'File'}
+                </span>
+                <span className={selectedWorkflowDef.project_id ? 'source-badge source-badge-project' : 'source-badge source-badge-manual'}>
+                  {selectedWorkflowDef.project_id ? 'Project' : 'Manual'}
+                </span>
+                {selectedWorkflowDef.source_path && (
+                  <span className="cell-mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                    {selectedWorkflowDef.source_path}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="form-group">

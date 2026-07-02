@@ -39,11 +39,20 @@ export interface Workflow {
   id: number;
   name: string;
   yaml: string;
+  definition_kind: 'file' | 'directory';
+  files: WorkflowDefinitionFile[];
   uploaded_by: number;
   project_id?: number;
   source_path?: string;
+  source_kind: string;
+  source_root?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface WorkflowDefinitionFile {
+  path: string;
+  content: string;
 }
 
 export interface Project {
@@ -61,6 +70,8 @@ export interface Project {
 
 export interface ProjectFile {
   path: string;
+  kind: 'file' | 'directory';
+  name: string;
   imported: boolean;
 }
 
@@ -291,6 +302,13 @@ export const api = {
     });
   },
 
+  validateWorkflow(definition: { yaml?: string; definition_kind?: 'file' | 'directory'; files?: WorkflowDefinitionFile[] }) {
+    return request<{ valid: boolean; error?: string }>('/workflows/validate', {
+      method: 'POST',
+      body: JSON.stringify(definition),
+    });
+  },
+
   createWorkflow(name: string, yaml: string) {
     return request<Workflow>('/workflows', {
       method: 'POST',
@@ -298,10 +316,24 @@ export const api = {
     });
   },
 
+  createWorkflowDefinition(name: string, definitionKind: 'file' | 'directory', files: WorkflowDefinitionFile[]) {
+    return request<Workflow>('/workflows', {
+      method: 'POST',
+      body: JSON.stringify({ name, definition_kind: definitionKind, files }),
+    });
+  },
+
   updateWorkflow(name: string, yaml: string) {
     return request<Workflow>(`/workflows/${name}`, {
       method: 'PUT',
       body: JSON.stringify({ yaml }),
+    });
+  },
+
+  updateWorkflowDefinition(name: string, definitionKind: 'file' | 'directory', files: WorkflowDefinitionFile[]) {
+    return request<Workflow>(`/workflows/${name}`, {
+      method: 'PUT',
+      body: JSON.stringify({ definition_kind: definitionKind, files }),
     });
   },
 
@@ -354,6 +386,13 @@ export const api = {
     return request<{ name: string; path: string; error?: string }[]>(`/projects/${id}/import`, {
       method: 'POST',
       body: JSON.stringify({ files }),
+    });
+  },
+
+  importProjectDefinitions(id: number, definitions: { path: string; kind: 'file' | 'directory' }[]) {
+    return request<{ name: string; path: string; error?: string }[]>(`/projects/${id}/import`, {
+      method: 'POST',
+      body: JSON.stringify({ definitions }),
     });
   },
 };

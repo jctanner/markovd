@@ -102,6 +102,20 @@ func (d *DB) migrate() error {
 			END IF;
 		END $$`,
 		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='workflows' AND column_name='definition_kind') THEN
+				ALTER TABLE workflows ADD COLUMN definition_kind TEXT NOT NULL DEFAULT 'file';
+				ALTER TABLE workflows ADD COLUMN definition_json JSONB NOT NULL DEFAULT '[]';
+				ALTER TABLE workflows ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'manual';
+				ALTER TABLE workflows ADD COLUMN source_root TEXT NOT NULL DEFAULT '';
+			END IF;
+		END $$`,
+		`UPDATE workflows
+		 SET definition_kind = 'file',
+		     definition_json = jsonb_build_array(jsonb_build_object('path', 'workflow.yaml', 'content', yaml)),
+		     source_kind = CASE WHEN project_id IS NULL THEN 'manual' ELSE 'project' END,
+		     source_root = COALESCE(NULLIF(source_path, ''), source_root)
+		 WHERE definition_json = '[]'::jsonb`,
+		`DO $$ BEGIN
 			IF EXISTS (
 				SELECT 1 FROM information_schema.table_constraints
 				WHERE constraint_name = 'runs_workflow_id_fkey' AND table_name = 'runs'

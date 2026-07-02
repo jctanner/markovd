@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jctanner/markovd/internal/models"
+	"github.com/jctanner/markovd/internal/workflowdef"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -130,6 +132,58 @@ func TestStartCreatesConfigMapAndJob(t *testing.T) {
 	}
 	if !hasRunID {
 		t.Error("args missing --run-id matching run ID")
+	}
+}
+
+func TestStartCreatesDirectoryWorkflowConfigMapAndJob(t *testing.T) {
+	r := newTestRunner(nil)
+	ctx := context.Background()
+
+	req := RunRequest{
+		Workflow: models.WorkflowDefinition{
+			Kind: workflowdef.KindDirectory,
+			Files: []models.WorkflowDefinitionFile{
+				{Path: "meta.yaml", Content: "entrypoint: main\n"},
+				{Path: "vars.yaml", Content: "{}\n"},
+				{Path: "rules.yaml", Content: "[]\n"},
+				{Path: "step_types.yaml", Content: "{}\n"},
+				{Path: "workflows/main.yaml", Content: "name: main\nsteps: []\n"},
+			},
+		},
+	}
+
+	runID, err := r.Start(ctx, req)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	cm, err := r.client.CoreV1().ConfigMaps("ai-pipeline").Get(ctx, runID+"-workflow", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("ConfigMap not created: %v", err)
+	}
+	if _, ok := cm.Data["f-000"]; !ok {
+		t.Fatalf("expected safe ConfigMap keys, got %v", cm.Data)
+	}
+
+	job, err := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Job not created: %v", err)
+	}
+	spec := job.Spec.Template.Spec
+	items := spec.Volumes[0].ConfigMap.Items
+	paths := map[string]bool{}
+	for _, item := range items {
+		paths[item.Path] = true
+	}
+	for _, want := range []string{"meta.yaml", "vars.yaml", "rules.yaml", "step_types.yaml", "workflows/main.yaml"} {
+		if !paths[want] {
+			t.Fatalf("ConfigMap items missing path %q: %#v", want, items)
+		}
+	}
+
+	args := spec.Containers[0].Args
+	if len(args) < 2 || args[0] != "run" || args[1] != "/etc/markov/workflow" {
+		t.Fatalf("args = %v, want run /etc/markov/workflow", args)
 	}
 }
 

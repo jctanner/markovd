@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jctanner/markovd/internal/models"
+	"github.com/jctanner/markovd/internal/workflowdef"
 )
 
 func (d *DB) CreateProject(ctx context.Context, name, url, branch, clonePath string, createdBy int) (*models.Project, error) {
@@ -93,23 +94,46 @@ func (d *DB) UpdateProjectSyncStatus(ctx context.Context, id int, status, syncEr
 }
 
 func (d *DB) ImportProjectWorkflow(ctx context.Context, projectID int, name, yaml, sourcePath string, uploadedBy int) (*models.Workflow, error) {
+	def := workflowdef.FromLegacyYAML(yaml)
+	return d.ImportProjectWorkflowDefinition(ctx, projectID, name, def, sourcePath, sourcePath, uploadedBy)
+}
+
+func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int, name string, def models.WorkflowDefinition, sourcePath, sourceRoot string, uploadedBy int) (*models.Workflow, error) {
+	def, err := workflowdef.Normalize(def.Kind, def.Files)
+	if err != nil {
+		return nil, err
+	}
+	defJSON, err := workflowdef.MarshalFiles(def.Files)
+	if err != nil {
+		return nil, err
+	}
+	yaml := workflowdef.LegacyYAML(def)
 	var w models.Workflow
-	err := d.QueryRowContext(ctx,
-		`INSERT INTO workflows (name, yaml, uploaded_by, project_id, source_path)
-		 VALUES ($1, $2, $3, $4, $5)
-		 ON CONFLICT (name) DO UPDATE SET yaml = $2, project_id = $4, source_path = $5, updated_at = now()
-		 RETURNING id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at`,
-		name, yaml, uploadedBy, projectID, sourcePath,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt)
+	var rawFiles string
+	err = d.QueryRowContext(ctx,
+		`INSERT INTO workflows (name, yaml, definition_kind, definition_json, uploaded_by, project_id, source_path, source_kind, source_root)
+		 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'project', $8)
+		 ON CONFLICT (name) DO UPDATE SET
+		   yaml = $2,
+		   definition_kind = $3,
+		   definition_json = $4::jsonb,
+		   project_id = $6,
+		   source_path = $7,
+		   source_kind = 'project',
+		   source_root = $8,
+		   updated_at = now()
+		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at`,
+		name, yaml, def.Kind, defJSON, uploadedBy, projectID, sourcePath, sourceRoot,
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("importing project workflow: %w", err)
 	}
-	return &w, nil
+	return hydrateWorkflow(&w, rawFiles)
 }
 
 func (d *DB) GetWorkflowsByProjectID(ctx context.Context, projectID int) ([]models.Workflow, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, name, yaml, uploaded_by, project_id, source_path, created_at, updated_at
+		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at
 		 FROM workflows WHERE project_id = $1 ORDER BY name`, projectID,
 	)
 	if err != nil {
@@ -120,10 +144,15 @@ func (d *DB) GetWorkflowsByProjectID(ctx context.Context, projectID int) ([]mode
 	var workflows []models.Workflow
 	for rows.Next() {
 		var w models.Workflow
-		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		var rawFiles string
+		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning project workflow: %w", err)
 		}
-		workflows = append(workflows, w)
+		hydrated, err := hydrateWorkflow(&w, rawFiles)
+		if err != nil {
+			return nil, fmt.Errorf("hydrating project workflow: %w", err)
+		}
+		workflows = append(workflows, *hydrated)
 	}
 	return workflows, rows.Err()
 }

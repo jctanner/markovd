@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jctanner/markovd/internal/projects"
+	"github.com/jctanner/markovd/internal/workflowdef"
 )
 
 type createProjectRequest struct {
@@ -20,7 +20,13 @@ type createProjectRequest struct {
 }
 
 type importFilesRequest struct {
-	Files []string `json:"files"`
+	Files       []string                   `json:"files"`
+	Definitions []projectDefinitionRequest `json:"definitions"`
+}
+
+type projectDefinitionRequest struct {
+	Path string `json:"path"`
+	Kind string `json:"kind"`
 }
 
 var safeNameRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
@@ -148,12 +154,12 @@ func (s *Server) handleSyncProject(w http.ResponseWriter, r *http.Request) {
 		if wf.SourcePath == "" {
 			continue
 		}
-		content, err := projects.ReadFile(clonePath, wf.SourcePath)
+		def, err := projects.ReadWorkflowDefinition(clonePath, wf.SourceRoot, wf.DefinitionKind)
 		if err != nil {
 			log.Printf("failed to re-sync workflow %s from project %d: %v", wf.Name, id, err)
 			continue
 		}
-		if _, err := s.db.ImportProjectWorkflow(r.Context(), id, wf.Name, content, wf.SourcePath, wf.UploadedBy); err != nil {
+		if _, err := s.db.ImportProjectWorkflowDefinition(r.Context(), id, wf.Name, def, wf.SourcePath, wf.SourceRoot, wf.UploadedBy); err != nil {
 			log.Printf("failed to update workflow %s: %v", wf.Name, err)
 		}
 	}
@@ -180,7 +186,7 @@ func (s *Server) handleListProjectFiles(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	yamlFiles, err := projects.ListYAMLFiles(clonePath)
+	definitions, err := projects.ListWorkflowDefinitions(clonePath)
 	if err != nil {
 		writeJSON(w, http.StatusOK, []interface{}{})
 		return
@@ -194,11 +200,13 @@ func (s *Server) handleListProjectFiles(w http.ResponseWriter, r *http.Request) 
 
 	type fileEntry struct {
 		Path     string `json:"path"`
+		Kind     string `json:"kind"`
+		Name     string `json:"name"`
 		Imported bool   `json:"imported"`
 	}
-	result := make([]fileEntry, 0, len(yamlFiles))
-	for _, f := range yamlFiles {
-		result = append(result, fileEntry{Path: f, Imported: importedPaths[f]})
+	result := make([]fileEntry, 0, len(definitions))
+	for _, d := range definitions {
+		result = append(result, fileEntry{Path: d.Path, Kind: d.Kind, Name: d.Name, Imported: importedPaths[d.Path]})
 	}
 	writeJSON(w, http.StatusOK, result)
 }
@@ -215,8 +223,12 @@ func (s *Server) handleImportProjectFiles(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 		return
 	}
-	if len(req.Files) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no files specified"})
+	definitions := req.Definitions
+	for _, file := range req.Files {
+		definitions = append(definitions, projectDefinitionRequest{Path: file, Kind: "file"})
+	}
+	if len(definitions) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no workflow definitions specified"})
 		return
 	}
 
@@ -234,27 +246,31 @@ func (s *Server) handleImportProjectFiles(w http.ResponseWriter, r *http.Request
 	}
 	var results []importResult
 
-	for _, filePath := range req.Files {
-		content, err := projects.ReadFile(clonePath, filePath)
+	for _, requested := range definitions {
+		if requested.Kind == "" {
+			requested.Kind = "file"
+		}
+		def, err := projects.ReadWorkflowDefinition(clonePath, requested.Path, requested.Kind)
 		if err != nil {
-			results = append(results, importResult{Path: filePath, Error: err.Error()})
+			results = append(results, importResult{Path: requested.Path, Error: err.Error()})
+			continue
+		}
+		if err := workflowdef.ValidateWithMarkov(r.Context(), s.markovBin, def); err != nil {
+			results = append(results, importResult{Path: requested.Path, Error: err.Error()})
 			continue
 		}
 
-		wfName := deriveWorkflowName(filePath)
-		_, err = s.db.ImportProjectWorkflow(r.Context(), id, wfName, content, filePath, claims.UserID)
+		wfName := deriveWorkflowName(requested.Path)
+		_, err = s.db.ImportProjectWorkflowDefinition(r.Context(), id, wfName, def, requested.Path, requested.Path, claims.UserID)
 		if err != nil {
-			results = append(results, importResult{Name: wfName, Path: filePath, Error: err.Error()})
+			results = append(results, importResult{Name: wfName, Path: requested.Path, Error: err.Error()})
 			continue
 		}
-		results = append(results, importResult{Name: wfName, Path: filePath})
+		results = append(results, importResult{Name: wfName, Path: requested.Path})
 	}
 	writeJSON(w, http.StatusOK, results)
 }
 
 func deriveWorkflowName(filePath string) string {
-	name := strings.TrimSuffix(filePath, filepath.Ext(filePath))
-	name = strings.ReplaceAll(name, "/", "-")
-	name = strings.ReplaceAll(name, "\\", "-")
-	return name
+	return projects.DeriveWorkflowName(filePath)
 }

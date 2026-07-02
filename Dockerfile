@@ -14,7 +14,7 @@ COPY ui/ .
 RUN npm run build
 
 FROM docker.io/library/debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
 COPY --from=go-build /markovd /usr/local/bin/markovd
 COPY bin/markov /usr/local/bin/markov
 COPY --from=ui-build /ui/dist /srv/ui
