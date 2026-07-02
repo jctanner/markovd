@@ -108,10 +108,15 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 		})
 	}
 
+	workflowMountPath := "/etc/markov"
+	if def.Kind == workflowdef.KindDirectory {
+		workflowMountPath = "/etc/markov/workflow"
+	}
+
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "workflow",
-			MountPath: "/etc/markov",
+			MountPath: workflowMountPath,
 			ReadOnly:  true,
 		},
 	}

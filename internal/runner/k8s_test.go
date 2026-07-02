@@ -170,6 +170,9 @@ func TestStartCreatesDirectoryWorkflowConfigMapAndJob(t *testing.T) {
 		t.Fatalf("Job not created: %v", err)
 	}
 	spec := job.Spec.Template.Spec
+	if len(spec.Containers[0].VolumeMounts) != 1 || spec.Containers[0].VolumeMounts[0].MountPath != "/etc/markov/workflow" {
+		t.Fatalf("directory workflow mount = %#v, want /etc/markov/workflow", spec.Containers[0].VolumeMounts)
+	}
 	items := spec.Volumes[0].ConfigMap.Items
 	paths := map[string]bool{}
 	for _, item := range items {
