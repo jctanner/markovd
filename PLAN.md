@@ -44,6 +44,7 @@ None.
 
 ## Fixed Bugs
 
+- [Run graph flattens nested workflow calls](docs/bugs/fixed/run-graph-flattens-nested-workflows.md)
 - [Project import rejects directory workflows with `step_types/`](docs/bugs/fixed/project-import-rejects-step-types-directory.md)
 - [Project import treats `meta.yaml` directory roots as files](docs/bugs/fixed/project-import-meta-root-detected-as-files.md)
 - [Configurable Kubernetes job image pull policy](docs/bugs/fixed/runner-bug-2-imagepullpolicy.md)

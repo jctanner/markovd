@@ -18,6 +18,7 @@ const NODE_H = 72;
 const SUMMARY_NODE_H = 96;
 const NODE_GAP_Y = 60;
 const FORK_GAP_X = 280;
+const CHILD_GAP_X = 340;
 const START_Y = 40;
 const START_X = 0;
 const COLLAPSE_THRESHOLD = 5;
@@ -433,40 +434,28 @@ function buildGraph(
   const edges: Edge[] = [];
   const collapsedForks = new Map<string, CollapsedForkMeta>();
 
-  interface ChainEntry {
-    step: Step;
-    path: string;
-    forkPrefix: string;
+  function childPath(path: string, stepName: string): string {
+    return path ? `${path}-${stepName}` : stepName;
   }
 
-  function expandChain(path: string): ChainEntry[] {
-    const stepsAtPath = groups.get(path) || [];
-    const chain: ChainEntry[] = [];
-    for (const step of stepsAtPath) {
-      const forkPrefix = path ? `${path}-${step.step_name}` : step.step_name;
-      chain.push({ step, path, forkPrefix });
-      if (groups.has(forkPrefix)) {
-        chain.push(...expandChain(forkPrefix));
-      }
-    }
-    return chain;
+  function nodeIdFor(path: string, stepName: string): string {
+    return `${path || 'main'}::${stepName}`;
   }
 
-  function findForEachForks(forkPrefix: string, chainPrefixes: string[]): string[] {
+  function displayForkLabel(path: string): string {
+    return path;
+  }
+
+  function findForEachForks(forkPrefix: string): string[] {
     const prefix = forkPrefix + '-';
     const candidates: string[] = [];
     for (const fid of groups.keys()) {
       if (!fid.startsWith(prefix)) continue;
-      const ownedByChild = chainPrefixes.some(cp => cp.length > forkPrefix.length && fid.startsWith(cp + '-'));
-      if (!ownedByChild) candidates.push(fid);
+      candidates.push(fid);
     }
     return candidates.filter(fid =>
       !candidates.some(other => other !== fid && fid.startsWith(other + '-'))
     );
-  }
-
-  function forkDisplayKey(forkId: string, forkPrefix: string): string {
-    return forkId.substring(forkPrefix.length + 1);
   }
 
   function aggregateBranchStatuses(forkIds: string[]): { completed: number; running: number; failed: number; skipped: number; pending: number } {
@@ -483,25 +472,29 @@ function buildGraph(
   }
 
   function layoutChain(
-    chain: ChainEntry[],
+    path: string,
     x: number,
     startY: number,
-    displayForkId: string,
   ): { nodeIds: string[]; endY: number } {
+    const chain = groups.get(path) || [];
     const chainNodeIds: string[] = [];
     const chainSteps: Step[] = [];
     const chainForkIndices = new Map<number, string[]>();
+    const childEndByIndex = new Map<number, number>();
     let y = startY;
+    const displayForkId = displayForkLabel(path);
 
-    const chainPrefixes = chain.map(e => e.forkPrefix);
     for (let i = 0; i < chain.length; i++) {
-      const forks = findForEachForks(chain[i].forkPrefix, chainPrefixes);
+      const forkPrefix = childPath(path, chain[i].step_name);
+      if (groups.has(forkPrefix)) continue;
+      const forks = findForEachForks(forkPrefix);
       if (forks.length > 0) chainForkIndices.set(i, forks);
     }
 
     for (let i = 0; i < chain.length; i++) {
-      const { step, path, forkPrefix } = chain[i];
-      const nodeId = `${displayForkId || 'main'}::${path}::${step.step_name}`;
+      const step = chain[i];
+      const forkPrefix = childPath(path, step.step_name);
+      const nodeId = nodeIdFor(path, step.step_name);
       stepMap.set(nodeId, step);
       nodes.push({
         id: nodeId,
@@ -522,6 +515,43 @@ function buildGraph(
       chainNodeIds.push(nodeId);
       chainSteps.push(step);
       y += NODE_H + NODE_GAP_Y;
+
+      if (groups.has(forkPrefix)) {
+        const childStartY = y;
+        const { nodeIds: childNodeIds, endY: childEndY } = layoutChain(
+          forkPrefix,
+          x + CHILD_GAP_X,
+          childStartY,
+        );
+        childEndByIndex.set(i, childEndY);
+
+        if (childNodeIds.length > 0) {
+          const runningChild = (groups.get(forkPrefix) || []).some(s => s.status === 'running');
+          edges.push({
+            id: `${nodeId}-child->${childNodeIds[0]}`,
+            source: nodeId,
+            target: childNodeIds[0],
+            type: 'smoothstep',
+            animated: runningChild,
+            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+            style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+          });
+
+          if (i + 1 < chain.length) {
+            const nextNodeId = nodeIdFor(path, chain[i + 1].step_name);
+            edges.push({
+              id: `${childNodeIds[childNodeIds.length - 1]}-child-join->${nextNodeId}`,
+              source: childNodeIds[childNodeIds.length - 1],
+              target: nextNodeId,
+              type: 'smoothstep',
+              markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+              style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
+            });
+          }
+        }
+
+        y = Math.max(y, childEndY);
+      }
 
       const forkIds = chainForkIndices.get(i);
       if (forkIds && forkIds.length > 0) {
@@ -559,7 +589,7 @@ function buildGraph(
           y += SUMMARY_NODE_H + NODE_GAP_Y;
 
           if (i + 1 < chain.length) {
-            const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
+            const nextNodeId = nodeIdFor(path, chain[i + 1].step_name);
             edges.push({
               id: `${summaryId}-join->${nextNodeId}`,
               source: summaryId,
@@ -579,26 +609,25 @@ function buildGraph(
           for (let fi = 0; fi < forkIds.length; fi++) {
             const forkId = forkIds[fi];
             const forkX = forkBaseX + fi * FORK_GAP_X;
-            const forkKey = forkDisplayKey(forkId, forkPrefix);
-            const forkChain = expandChain(forkId);
 
             const { nodeIds: fNodeIds, endY: fEndY } = layoutChain(
-              forkChain, forkX, forkStartY, forkKey,
+              forkId, forkX, forkStartY,
             );
 
             if (fNodeIds.length > 0) {
+              const forkSteps = groups.get(forkId) || [];
               edges.push({
                 id: `${nodeId}-fork->${fNodeIds[0]}`,
                 source: nodeId,
                 target: fNodeIds[0],
                 type: 'smoothstep',
-                animated: forkChain[0]?.step.status === 'running',
+                animated: forkSteps[0]?.status === 'running',
                 markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
                 style: { stroke: 'var(--accent)', strokeWidth: 1.5, strokeDasharray: '6 3' },
               });
 
               if (i + 1 < chain.length) {
-                const nextNodeId = `${displayForkId || 'main'}::${chain[i + 1].path}::${chain[i + 1].step.step_name}`;
+                const nextNodeId = nodeIdFor(path, chain[i + 1].step_name);
                 edges.push({
                   id: `${fNodeIds[fNodeIds.length - 1]}-join->${nextNodeId}`,
                   source: fNodeIds[fNodeIds.length - 1],
@@ -620,6 +649,7 @@ function buildGraph(
 
     for (let i = 0; i < chainNodeIds.length - 1; i++) {
       if (chainForkIndices.has(i)) continue;
+      if (childEndByIndex.has(i)) continue;
       const isRunning = chainSteps[i + 1].status === 'running';
       edges.push({
         id: `${chainNodeIds[i]}->${chainNodeIds[i + 1]}`,
@@ -635,8 +665,7 @@ function buildGraph(
     return { nodeIds: chainNodeIds, endY: y };
   }
 
-  const mainChain = expandChain('');
-  layoutChain(mainChain, START_X, START_Y, '');
+  layoutChain('', START_X, START_Y);
 
   return { nodes, edges, stepMap, collapsedForks };
 }

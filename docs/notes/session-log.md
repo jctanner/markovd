@@ -156,3 +156,22 @@ Verified:
 Notes:
 - `npx eslint src/pages/Projects.tsx` still fails on pre-existing React hook
   lint errors in that file.
+
+## 2026-07-07
+
+Agent: codex
+
+Completed:
+- Fixed the Run Detail graph layout so nested workflow calls render as nested
+  lanes instead of being flattened into the parent workflow chain.
+- Preserved existing branch expansion and summary behavior for `for_each`
+  forks while treating exact child `fork_id` groups as sub-workflows.
+- Moved the graph flattening bug record to `docs/bugs/fixed/` with Playwright
+  coordinate evidence and a screenshot artifact.
+
+Verified:
+- Playwright against `http://127.0.0.1:5173/runs/markov-run-b09c12f9` showed
+  `main` at `x=0`, `run_pipeline` children at `x=340`, and nested `run-skill`
+  internals at `x=680`.
+- `npm run build` in `ui/`.
+- `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.
