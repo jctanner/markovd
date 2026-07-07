@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,11 +15,12 @@ import (
 )
 
 type createRunRequest struct {
-	WorkflowName  string               `json:"workflow_name"`
-	Vars          map[string]string    `json:"vars"`
-	Debug         bool                 `json:"debug"`
-	Volumes       []runner.PVCMount    `json:"volumes,omitempty"`
-	SecretVolumes []runner.SecretMount `json:"secret_volumes,omitempty"`
+	WorkflowName       string               `json:"workflow_name"`
+	WorkflowEntrypoint string               `json:"workflow_entrypoint,omitempty"`
+	Vars               map[string]string    `json:"vars"`
+	Debug              bool                 `json:"debug"`
+	Volumes            []runner.PVCMount    `json:"volumes,omitempty"`
+	SecretVolumes      []runner.SecretMount `json:"secret_volumes,omitempty"`
 }
 
 type runDetailResponse struct {
@@ -120,16 +122,18 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	varsJSON, _ := json.Marshal(req.Vars)
 	volumesJSON, _ := json.Marshal(req.Volumes)
 	secretVolumesJSON, _ := json.Marshal(req.SecretVolumes)
+	workflowEntrypoint := strings.TrimSpace(req.WorkflowEntrypoint)
 
 	runReq := runner.RunRequest{
-		WorkflowYAML:  wf.YAML,
-		Workflow:      models.WorkflowDefinition{Kind: wf.DefinitionKind, Files: wf.Files},
-		Vars:          req.Vars,
-		CallbackURL:   s.callbackURL,
-		CallbackToken: s.callbackToken,
-		Debug:         req.Debug,
-		Volumes:       req.Volumes,
-		SecretVolumes: req.SecretVolumes,
+		WorkflowYAML:       wf.YAML,
+		Workflow:           models.WorkflowDefinition{Kind: wf.DefinitionKind, Files: wf.Files},
+		WorkflowEntrypoint: workflowEntrypoint,
+		Vars:               req.Vars,
+		CallbackURL:        s.callbackURL,
+		CallbackToken:      s.callbackToken,
+		Debug:              req.Debug,
+		Volumes:            req.Volumes,
+		SecretVolumes:      req.SecretVolumes,
 	}
 
 	runID, err := s.runner.Start(r.Context(), runReq)

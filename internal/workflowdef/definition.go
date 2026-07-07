@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/jctanner/markovd/internal/models"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -23,7 +24,6 @@ var requiredDirectoryFiles = []string{
 	"meta.yaml",
 	"vars.yaml",
 	"rules.yaml",
-	"step_types.yaml",
 }
 
 func FromLegacyYAML(yamlContent string) models.WorkflowDefinition {
@@ -116,12 +116,18 @@ func validateShape(def models.WorkflowDefinition, seen map[string]bool) error {
 				return fmt.Errorf("missing required directory workflow file: %s", required)
 			}
 		}
+		hasStepTypes := seen["step_types.yaml"]
 		hasWorkflow := false
 		for _, f := range def.Files {
+			if strings.HasPrefix(f.Path, "step_types/") && isYAMLPath(f.Path) {
+				hasStepTypes = true
+			}
 			if strings.HasPrefix(f.Path, "workflows/") && isYAMLPath(f.Path) {
 				hasWorkflow = true
-				break
 			}
+		}
+		if !hasStepTypes {
+			return errors.New("directory workflow definitions must include step_types.yaml or at least one step_types/*.yaml file")
 		}
 		if !hasWorkflow {
 			return errors.New("directory workflow definitions must include at least one workflows/*.yaml file")
@@ -161,13 +167,90 @@ func LegacyYAML(def models.WorkflowDefinition) string {
 	return ""
 }
 
+func RuntimeCompatibleDefinition(def models.WorkflowDefinition) (models.WorkflowDefinition, error) {
+	def, err := Normalize(def.Kind, def.Files)
+	if err != nil {
+		return models.WorkflowDefinition{}, err
+	}
+	if def.Kind != KindDirectory || hasFile(def.Files, "step_types.yaml") {
+		return def, nil
+	}
+
+	stepTypesYAML, err := mergedStepTypesYAML(def.Files)
+	if err != nil {
+		return models.WorkflowDefinition{}, err
+	}
+
+	files := make([]models.WorkflowDefinitionFile, 0, len(def.Files))
+	for _, f := range def.Files {
+		if strings.HasPrefix(f.Path, "step_types/") && isYAMLPath(f.Path) {
+			continue
+		}
+		files = append(files, f)
+	}
+	files = append(files, models.WorkflowDefinitionFile{
+		Path:    "step_types.yaml",
+		Content: stepTypesYAML,
+	})
+	return Normalize(def.Kind, files)
+}
+
+func hasFile(files []models.WorkflowDefinitionFile, path string) bool {
+	for _, f := range files {
+		if f.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func mergedStepTypesYAML(files []models.WorkflowDefinitionFile) (string, error) {
+	var out strings.Builder
+	seen := map[string]string{}
+	for _, f := range files {
+		if !strings.HasPrefix(f.Path, "step_types/") || !isYAMLPath(f.Path) {
+			continue
+		}
+		var node yaml.Node
+		if err := yaml.Unmarshal([]byte(f.Content), &node); err != nil {
+			return "", fmt.Errorf("parsing %s: %w", f.Path, err)
+		}
+		if len(node.Content) == 0 {
+			continue
+		}
+		mapping := node.Content[0]
+		if mapping.Kind != yaml.MappingNode {
+			return "", fmt.Errorf("step type file %s must contain a YAML map", f.Path)
+		}
+		for i := 0; i+1 < len(mapping.Content); i += 2 {
+			name := mapping.Content[i].Value
+			if previous, ok := seen[name]; ok {
+				return "", fmt.Errorf("duplicate step type %q in %s and %s", name, previous, f.Path)
+			}
+			seen[name] = f.Path
+		}
+		if strings.TrimSpace(f.Content) == "" {
+			continue
+		}
+		if out.Len() > 0 {
+			out.WriteString("\n")
+		}
+		out.WriteString(strings.TrimRight(f.Content, "\n"))
+		out.WriteString("\n")
+	}
+	if out.Len() == 0 {
+		return "{}\n", nil
+	}
+	return out.String(), nil
+}
+
 type Materialized struct {
 	Path    string
 	Cleanup func()
 }
 
 func Materialize(def models.WorkflowDefinition) (*Materialized, error) {
-	def, err := Normalize(def.Kind, def.Files)
+	def, err := RuntimeCompatibleDefinition(def)
 	if err != nil {
 		return nil, err
 	}

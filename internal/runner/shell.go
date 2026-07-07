@@ -34,6 +34,9 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 
 	runID := generateRunID()
 	args := []string{"run", m.Path, "--verbose", "--run-id", runID}
+	if req.WorkflowEntrypoint != "" {
+		args = append(args, "--workflow", req.WorkflowEntrypoint)
+	}
 	if req.Debug {
 		args = append(args, "--debug")
 	}

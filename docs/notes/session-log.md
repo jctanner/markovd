@@ -73,3 +73,86 @@ Verified:
 
 Next:
 - Commit the implementation.
+
+## 2026-07-07
+
+Agent: codex
+
+Completed:
+- Collapsed the Trigger Run PVC and secret volume selectors behind an Advanced
+  toggle while preserving selected defaults and submission payload construction.
+- Added compact selected-count text to the collapsed Advanced control.
+
+Verified:
+- `npm run build` in `ui/`.
+- `npx eslint src/pages/TriggerRun.tsx` in `ui/`.
+
+Notes:
+- Full `npm run lint` in `ui/` still fails on pre-existing unrelated React lint
+  errors outside the edited Trigger Run page.
+
+## 2026-07-07
+
+Agent: codex
+
+Completed:
+- Added an optional Trigger Run workflow entrypoint override field that maps to
+  Markov's `--workflow` run flag.
+- Trimmed and omitted blank workflow entrypoint overrides in the frontend API
+  helper and API handler.
+- Passed non-blank overrides through shell and Kubernetes runners as
+  `--workflow <name>`.
+- Added datalist suggestions for likely workflow names from the selected
+  workflow definition. Directory definitions use `workflows/*.yaml` top-level
+  `name:` fields; standalone definitions use conservative top-level
+  `workflows:` entry parsing.
+
+Verified:
+- Read `../markov/docs/reference/cli.md` and
+  `../markov/docs/reference/workflow-file.md`.
+- `env GOCACHE=/tmp/go-build-cache go test ./internal/runner`
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `npm run build` in `ui/`
+- `npx eslint src/pages/TriggerRun.tsx` in `ui/`
+
+## 2026-07-07
+
+Agent: codex
+
+Completed:
+- Fixed project workflow discovery so a directory containing `meta.yaml` is
+  treated as a directory workflow root.
+- Added regression coverage for `var/demos/end-to-end`-style roots so internal
+  YAML files under the detected root are not listed as separate importable file
+  workflows.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./internal/projects`
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+
+## 2026-07-07
+
+Agent: codex
+
+Completed:
+- Reproduced the `var/demos/end-to-end` import failure through the running
+  `https://markovd.local` API. The backend rejected the directory with
+  `missing required directory workflow file: step_types.yaml`.
+- Updated workflow definition normalization to accept `step_types/*.yaml` as the
+  directory workflow step type source when `step_types.yaml` is absent.
+- Added runtime compatibility materialization for Markov binaries that still
+  require `step_types.yaml`: Markovd generates a merged `step_types.yaml` from
+  `step_types/*.yaml` for validation and runs, and omits the original
+  `step_types/` files from the runtime copy.
+- Improved the Projects page import failure message to include backend
+  per-path error details.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./internal/workflowdef ./internal/projects`
+- `env GOCACHE=/tmp/go-build-cache go test ./internal/workflowdef ./internal/projects ./internal/runner`
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `npm run build` in `ui/`
+
+Notes:
+- `npx eslint src/pages/Projects.tsx` still fails on pre-existing React hook
+  lint errors in that file.

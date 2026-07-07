@@ -133,7 +133,7 @@ export default function Projects() {
       const results = await api.importProjectDefinitions(selected.id, definitions);
       const errors = results.filter(r => r.error);
       if (errors.length > 0) {
-        setError(`Failed to import: ${errors.map(e => e.path).join(', ')}`);
+        setError(`Failed to import: ${errors.map(e => `${e.path}: ${e.error}`).join('; ')}`);
       } else {
         setSuccess(`Imported ${results.length} workflow(s).`);
       }

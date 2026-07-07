@@ -1,21 +1,80 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Workflow, PVCInfo, SecretInfo } from '../api';
+
+function cleanYAMLScalar(value: string): string {
+  return value.trim().replace(/^['"]|['"]$/g, '');
+}
+
+function workflowNameFromDirectoryFile(content: string): string | null {
+  const match = content.match(/^name:\s*([^#\n]+)/m);
+  return match ? cleanYAMLScalar(match[1]) : null;
+}
+
+function workflowNamesFromFile(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  const names: string[] = [];
+  let workflowsIndent: number | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const indent = line.length - line.trimStart().length;
+    if (workflowsIndent === null) {
+      if (trimmed === 'workflows:') workflowsIndent = indent;
+      continue;
+    }
+    if (indent <= workflowsIndent && !trimmed.startsWith('-')) break;
+
+    const match = line.match(/^(\s*)-\s+name:\s*([^#\n]+)/);
+    if (!match) continue;
+    const itemIndent = match[1].length;
+    if (itemIndent === workflowsIndent + 2) {
+      names.push(cleanYAMLScalar(match[2]));
+    }
+  }
+
+  return names;
+}
+
+function workflowEntrypointSuggestions(workflow?: Workflow): string[] {
+  if (!workflow) return [];
+  const names = workflow.definition_kind === 'directory'
+    ? workflow.files
+        .filter(file => file.path.startsWith('workflows/') && file.path.endsWith('.yaml'))
+        .map(file => workflowNameFromDirectoryFile(file.content))
+        .filter((name): name is string => Boolean(name))
+    : workflowNamesFromFile(workflow.yaml || workflow.files?.[0]?.content || '');
+  return Array.from(new Set(names)).sort();
+}
 
 export default function TriggerRun() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [pvcs, setPvcs] = useState<PVCInfo[]>([]);
   const [secrets, setSecrets] = useState<SecretInfo[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState('');
+  const [workflowEntrypoint, setWorkflowEntrypoint] = useState('');
   const [vars, setVars] = useState<{ key: string; value: string }[]>([]);
   const [selectedPVCs, setSelectedPVCs] = useState<Record<string, string>>({});
   const [selectedSecrets, setSelectedSecrets] = useState<Record<string, string>>({});
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [debug, setDebug] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const selectedWorkflowDef = workflows.find(w => w.name === selectedWorkflow);
+  const workflowEntrypoints = useMemo(
+    () => workflowEntrypointSuggestions(selectedWorkflowDef),
+    [selectedWorkflowDef],
+  );
+  const selectedPVCCount = Object.keys(selectedPVCs).length;
+  const selectedSecretCount = Object.keys(selectedSecrets).length;
+  const advancedSummary = [
+    pvcs.length > 0 ? `${selectedPVCCount} PVC${selectedPVCCount === 1 ? '' : 's'} selected` : '',
+    secrets.length > 0 ? `${selectedSecretCount} secret${selectedSecretCount === 1 ? '' : 's'} selected` : '',
+  ].filter(Boolean).join(' / ');
 
   useEffect(() => {
     api.listWorkflows().then(setWorkflows).catch(() => {});
@@ -93,7 +152,7 @@ export default function TriggerRun() {
       .filter(([, path]) => path)
       .map(([name, path]) => ({ name, secret: name, mount_path: path }));
     try {
-      const run = await api.createRun(selectedWorkflow, varsMap, debug, volsList, secretsList);
+      const run = await api.createRun(selectedWorkflow, varsMap, debug, volsList, secretsList, workflowEntrypoint);
       navigate(`/runs/${run.run_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger run');
@@ -115,7 +174,10 @@ export default function TriggerRun() {
             <select
               className="form-select"
               value={selectedWorkflow}
-              onChange={(e) => setSelectedWorkflow(e.target.value)}
+              onChange={(e) => {
+                setSelectedWorkflow(e.target.value);
+                setWorkflowEntrypoint('');
+              }}
               required
             >
               <option value="">Select a workflow...</option>
@@ -137,6 +199,25 @@ export default function TriggerRun() {
                   </span>
                 )}
               </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Workflow Entrypoint</label>
+            <input
+              type="text"
+              className="form-input"
+              value={workflowEntrypoint}
+              onChange={(e) => setWorkflowEntrypoint(e.target.value)}
+              placeholder="Use definition entrypoint"
+              list={workflowEntrypoints.length > 0 ? 'workflow-entrypoint-options' : undefined}
+            />
+            {workflowEntrypoints.length > 0 && (
+              <datalist id="workflow-entrypoint-options">
+                {workflowEntrypoints.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
             )}
           </div>
 
@@ -174,73 +255,94 @@ export default function TriggerRun() {
             ))}
           </div>
 
-          {pvcs.length > 0 && (
-            <div className="form-group">
-              <label className="form-label">PVC Volumes</label>
-              <div className="pvc-list">
-                {pvcs.map((p) => {
-                  const checked = p.name in selectedPVCs;
-                  return (
-                    <div key={p.name} className={`pvc-item${checked ? ' selected' : ''}`}>
-                      <label className="pvc-item-label">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePVC(p.name)}
-                        />
-                        <span className="pvc-item-name">{p.name}</span>
-                        <span className={`badge badge-${p.status === 'Bound' ? 'completed' : 'pending'}`} style={{ marginLeft: 8 }}>
-                          {p.status}
-                        </span>
-                      </label>
-                      {checked && (
-                        <input
-                          type="text"
-                          className="form-input pvc-mount-input"
-                          value={selectedPVCs[p.name]}
-                          onChange={(e) => updateMountPath(p.name, e.target.value)}
-                          placeholder="/mnt/..."
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {(pvcs.length > 0 || secrets.length > 0) && (
+            <div className="form-group trigger-advanced">
+              <button
+                type="button"
+                className="trigger-advanced-toggle"
+                aria-expanded={advancedOpen}
+                onClick={() => setAdvancedOpen(open => !open)}
+              >
+                <span className="trigger-advanced-title">
+                  <span className={`trigger-advanced-caret${advancedOpen ? ' open' : ''}`}>›</span>
+                  Advanced
+                </span>
+                {advancedSummary && <span className="trigger-advanced-summary">{advancedSummary}</span>}
+              </button>
 
-          {secrets.length > 0 && (
-            <div className="form-group">
-              <label className="form-label">Secret Volumes</label>
-              <div className="secret-list">
-                {secrets.map((s) => {
-                  const checked = s.name in selectedSecrets;
-                  return (
-                    <div key={s.name} className={`secret-item${checked ? ' selected' : ''}`}>
-                      <label className="secret-item-label">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSecret(s.name)}
-                        />
-                        <span className="secret-item-name">{s.name}</span>
-                        <span className="badge badge-pending" style={{ marginLeft: 8 }}>
-                          {s.type}
-                        </span>
-                      </label>
-                      {checked && (
-                        <input
-                          type="text"
-                          className="form-input secret-mount-input"
-                          value={selectedSecrets[s.name]}
-                          onChange={(e) => updateSecretMountPath(s.name, e.target.value)}
-                          placeholder="/etc/secrets/..."
-                        />
-                      )}
+              {advancedOpen && (
+                <div className="trigger-advanced-content">
+                  {pvcs.length > 0 && (
+                    <div className="trigger-advanced-section">
+                      <label className="form-label">PVC Volumes</label>
+                      <div className="pvc-list">
+                        {pvcs.map((p) => {
+                          const checked = p.name in selectedPVCs;
+                          return (
+                            <div key={p.name} className={`pvc-item${checked ? ' selected' : ''}`}>
+                              <label className="pvc-item-label">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePVC(p.name)}
+                                />
+                                <span className="pvc-item-name">{p.name}</span>
+                                <span className={`badge badge-${p.status === 'Bound' ? 'completed' : 'pending'}`} style={{ marginLeft: 8 }}>
+                                  {p.status}
+                                </span>
+                              </label>
+                              {checked && (
+                                <input
+                                  type="text"
+                                  className="form-input pvc-mount-input"
+                                  value={selectedPVCs[p.name]}
+                                  onChange={(e) => updateMountPath(p.name, e.target.value)}
+                                  placeholder="/mnt/..."
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+
+                  {secrets.length > 0 && (
+                    <div className="trigger-advanced-section">
+                      <label className="form-label">Secret Volumes</label>
+                      <div className="secret-list">
+                        {secrets.map((s) => {
+                          const checked = s.name in selectedSecrets;
+                          return (
+                            <div key={s.name} className={`secret-item${checked ? ' selected' : ''}`}>
+                              <label className="secret-item-label">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleSecret(s.name)}
+                                />
+                                <span className="secret-item-name">{s.name}</span>
+                                <span className="badge badge-pending" style={{ marginLeft: 8 }}>
+                                  {s.type}
+                                </span>
+                              </label>
+                              {checked && (
+                                <input
+                                  type="text"
+                                  className="form-input secret-mount-input"
+                                  value={selectedSecrets[s.name]}
+                                  onChange={(e) => updateSecretMountPath(s.name, e.target.value)}
+                                  placeholder="/etc/secrets/..."
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

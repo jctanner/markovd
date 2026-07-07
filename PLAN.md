@@ -24,6 +24,8 @@ None.
 
 ## Done Tasks
 
+- [Add Trigger Run workflow entrypoint override](docs/tasks/done/trigger-run-workflow-entrypoint.md)
+- [Collapse Trigger Run volume selectors](docs/tasks/done/trigger-run-advanced-volumes.md)
 - [Define workflow definition model](docs/tasks/done/workflow-definition-model.md)
 - [Materialize and validate workflow definitions](docs/tasks/done/workflow-definition-validation.md)
 - [Run directory workflows from shell and Kubernetes runners](docs/tasks/done/workflow-definition-runners.md)
@@ -42,6 +44,8 @@ None.
 
 ## Fixed Bugs
 
+- [Project import rejects directory workflows with `step_types/`](docs/bugs/fixed/project-import-rejects-step-types-directory.md)
+- [Project import treats `meta.yaml` directory roots as files](docs/bugs/fixed/project-import-meta-root-detected-as-files.md)
 - [Configurable Kubernetes job image pull policy](docs/bugs/fixed/runner-bug-2-imagepullpolicy.md)
 - [Run ID mismatch between markovd and markov](docs/bugs/fixed/runner-bug-4-run-id-mismatch.md)
 - [`rootRunID()` truncates `markov-run-*` IDs](docs/bugs/fixed/runner-bug-5-rootrunid-truncation.md)

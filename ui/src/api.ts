@@ -265,8 +265,17 @@ export const api = {
     return request<RunDetail>(`/runs/${runID}${qs}`);
   },
 
-  createRun(workflowName: string, vars: Record<string, string>, debug = false, volumes: { name: string; pvc: string; mount_path: string }[] = [], secretVolumes: { name: string; secret: string; mount_path: string }[] = []) {
+  createRun(
+    workflowName: string,
+    vars: Record<string, string>,
+    debug = false,
+    volumes: { name: string; pvc: string; mount_path: string }[] = [],
+    secretVolumes: { name: string; secret: string; mount_path: string }[] = [],
+    workflowEntrypoint = '',
+  ) {
     const body: Record<string, unknown> = { workflow_name: workflowName, vars, debug };
+    const cleanWorkflowEntrypoint = workflowEntrypoint.trim();
+    if (cleanWorkflowEntrypoint) body.workflow_entrypoint = cleanWorkflowEntrypoint;
     if (volumes.length > 0) body.volumes = volumes;
     if (secretVolumes.length > 0) body.secret_volumes = secretVolumes;
     return request<Run>('/runs', {

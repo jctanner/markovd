@@ -139,13 +139,8 @@ func ListWorkflowDefinitions(repoPath string) ([]WorkflowDefinitionEntry, error)
 }
 
 func isWorkflowDirectory(path string) bool {
-	for _, name := range []string{"meta.yaml", "vars.yaml", "rules.yaml", "step_types.yaml"} {
-		if _, err := os.Stat(filepath.Join(path, name)); err != nil {
-			return false
-		}
-	}
-	info, err := os.Stat(filepath.Join(path, "workflows"))
-	return err == nil && info.IsDir()
+	info, err := os.Stat(filepath.Join(path, "meta.yaml"))
+	return err == nil && !info.IsDir()
 }
 
 func insideWorkflowDirectory(file string, dirs []string) bool {

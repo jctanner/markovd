@@ -47,6 +47,22 @@ func TestShellRunnerMaterializesDirectoryWorkflow(t *testing.T) {
 	}
 }
 
+func TestShellRunnerPassesWorkflowEntrypoint(t *testing.T) {
+	record := runShellRunnerWithRequest(t, RunRequest{
+		Workflow: models.WorkflowDefinition{
+			Kind: workflowdef.KindFile,
+			Files: []models.WorkflowDefinitionFile{
+				{Path: "workflow.yaml", Content: "entrypoint: main\n"},
+			},
+		},
+		WorkflowEntrypoint: "deploy-target",
+	})
+	fields := strings.Fields(record.args)
+	if !containsArgPair(fields, "--workflow", "deploy-target") {
+		t.Fatalf("args = %q, want --workflow deploy-target", record.args)
+	}
+}
+
 type shellRunnerRecord struct {
 	args       string
 	kind       string
@@ -54,6 +70,11 @@ type shellRunnerRecord struct {
 }
 
 func runShellRunnerWithDefinition(t *testing.T, def models.WorkflowDefinition) shellRunnerRecord {
+	t.Helper()
+	return runShellRunnerWithRequest(t, RunRequest{Workflow: def})
+}
+
+func runShellRunnerWithRequest(t *testing.T, req RunRequest) shellRunnerRecord {
 	t.Helper()
 	dir := t.TempDir()
 	recordPath := filepath.Join(dir, "record")
@@ -71,7 +92,7 @@ sleep 0.2
 	t.Setenv("RECORD_PATH", recordPath)
 
 	runner := NewShellRunner(markovPath)
-	if _, err := runner.Start(context.Background(), RunRequest{Workflow: def}); err != nil {
+	if _, err := runner.Start(context.Background(), req); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 
@@ -83,6 +104,15 @@ sleep 0.2
 		kind:       strings.TrimSpace(kind),
 		mainExists: strings.TrimSpace(mainExists),
 	}
+}
+
+func containsArgPair(args []string, flag string, value string) bool {
+	for i, arg := range args {
+		if arg == flag && i+1 < len(args) && args[i+1] == value {
+			return true
+		}
+	}
+	return false
 }
 
 func waitForFile(t *testing.T, path string) string {

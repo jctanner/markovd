@@ -24,14 +24,15 @@ type SecretMount struct {
 }
 
 type RunRequest struct {
-	WorkflowYAML  string
-	Workflow      models.WorkflowDefinition
-	Vars          map[string]string
-	CallbackURL   string
-	CallbackToken string
-	Debug         bool
-	Volumes       []PVCMount
-	SecretVolumes []SecretMount
+	WorkflowYAML       string
+	Workflow           models.WorkflowDefinition
+	WorkflowEntrypoint string
+	Vars               map[string]string
+	CallbackURL        string
+	CallbackToken      string
+	Debug              bool
+	Volumes            []PVCMount
+	SecretVolumes      []SecretMount
 }
 
 func (r RunRequest) WorkflowDefinition() models.WorkflowDefinition {

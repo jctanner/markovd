@@ -1883,6 +1883,76 @@ td.cell-link a:hover {
   background: rgba(148, 163, 184, 0.1);
 }
 
+/* ===== TRIGGER RUN ADVANCED ===== */
+
+.trigger-advanced {
+  display: grid;
+  gap: 12px;
+}
+
+.trigger-advanced-toggle {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--ease-fast);
+}
+
+.trigger-advanced-toggle:hover {
+  border-color: var(--border-hover);
+}
+
+.trigger-advanced-toggle:focus-visible {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.trigger-advanced-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.trigger-advanced-caret {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform var(--ease-fast);
+}
+
+.trigger-advanced-caret.open {
+  transform: rotate(90deg);
+}
+
+.trigger-advanced-summary {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.trigger-advanced-content {
+  display: grid;
+  gap: 18px;
+}
+
+.trigger-advanced-section {
+  display: grid;
+  gap: 8px;
+}
+
 /* ===== PVC VOLUME SELECTOR ===== */
 
 .pvc-list {

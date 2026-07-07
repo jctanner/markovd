@@ -135,6 +135,30 @@ func TestStartCreatesConfigMapAndJob(t *testing.T) {
 	}
 }
 
+func TestStartPassesWorkflowEntrypoint(t *testing.T) {
+	r := newTestRunner(nil)
+	ctx := context.Background()
+
+	req := RunRequest{
+		WorkflowYAML:       "entrypoint: main\nworkflows:\n  - name: main\n    steps: []\n  - name: deploy-target\n    steps: []\n",
+		WorkflowEntrypoint: "deploy-target",
+	}
+
+	runID, err := r.Start(ctx, req)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, err := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Job not created: %v", err)
+	}
+	args := job.Spec.Template.Spec.Containers[0].Args
+	if !containsArgPair(args, "--workflow", "deploy-target") {
+		t.Fatalf("args = %q, want --workflow deploy-target", args)
+	}
+}
+
 func TestStartCreatesDirectoryWorkflowConfigMapAndJob(t *testing.T) {
 	r := newTestRunner(nil)
 	ctx := context.Background()
@@ -187,6 +211,45 @@ func TestStartCreatesDirectoryWorkflowConfigMapAndJob(t *testing.T) {
 	args := spec.Containers[0].Args
 	if len(args) < 2 || args[0] != "run" || args[1] != "/etc/markov/workflow" {
 		t.Fatalf("args = %v, want run /etc/markov/workflow", args)
+	}
+}
+
+func TestStartCreatesRuntimeStepTypesYAMLFromStepTypesDirectory(t *testing.T) {
+	r := newTestRunner(nil)
+	ctx := context.Background()
+
+	req := RunRequest{
+		Workflow: models.WorkflowDefinition{
+			Kind: workflowdef.KindDirectory,
+			Files: []models.WorkflowDefinitionFile{
+				{Path: "meta.yaml", Content: "entrypoint: main\n"},
+				{Path: "vars.yaml", Content: "{}\n"},
+				{Path: "rules.yaml", Content: "[]\n"},
+				{Path: "step_types/shell.yaml", Content: "echo_local:\n  base: shell_exec\n"},
+				{Path: "workflows/main.yaml", Content: "name: main\nsteps: []\n"},
+			},
+		},
+	}
+
+	runID, err := r.Start(ctx, req)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	job, err := r.client.BatchV1().Jobs("ai-pipeline").Get(ctx, runID, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Job not created: %v", err)
+	}
+	items := job.Spec.Template.Spec.Volumes[0].ConfigMap.Items
+	paths := map[string]bool{}
+	for _, item := range items {
+		paths[item.Path] = true
+	}
+	if !paths["step_types.yaml"] {
+		t.Fatalf("ConfigMap items missing generated step_types.yaml: %#v", items)
+	}
+	if paths["step_types/shell.yaml"] {
+		t.Fatalf("ConfigMap items kept step_types/shell.yaml: %#v", items)
 	}
 }
 

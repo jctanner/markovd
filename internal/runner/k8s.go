@@ -59,7 +59,7 @@ func NewKubernetesRunner(image, imagePullPolicy, namespace, serviceAccount strin
 func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, error) {
 	runID := generateRunID()
 	cmName := runID + "-workflow"
-	def, err := workflowdef.Normalize(req.WorkflowDefinition().Kind, req.WorkflowDefinition().Files)
+	def, err := workflowdef.RuntimeCompatibleDefinition(req.WorkflowDefinition())
 	if err != nil {
 		return "", fmt.Errorf("invalid workflow definition: %w", err)
 	}
@@ -85,6 +85,9 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 		"run", workflowPath, "--verbose",
 		"--run-id", runID,
 		"--namespace", r.namespace,
+	}
+	if req.WorkflowEntrypoint != "" {
+		args = append(args, "--workflow", req.WorkflowEntrypoint)
 	}
 	if req.Debug {
 		args = append(args, "--debug")
