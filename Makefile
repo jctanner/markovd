@@ -1,12 +1,17 @@
 COMPOSE ?= $(shell command -v podman-compose 2>/dev/null || echo .venv/bin/podman-compose)
 
-.PHONY: help build dev dev-api dev-ui deps clean compose-up compose-down compose-build admin-password admin-reset
+.PHONY: help build markovd-cli dev dev-api dev-ui deps clean compose-up compose-down compose-build admin-password admin-reset
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
-build: ## Build the markovd binary
+build: markovd-cli ## Build markovd and markovd-cli binaries
+	mkdir -p bin
 	go build -o bin/markovd ./cmd/markovd
+
+markovd-cli: ## Build the markovd API CLI binary
+	mkdir -p bin
+	go build -o bin/markovd-cli ./cmd/markovd-cli
 
 dev-api: ## Run the Go API server
 	go run ./cmd/markovd

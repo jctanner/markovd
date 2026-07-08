@@ -1,6 +1,5 @@
 # Binaries
-/bin/*
-!/bin/markovd-cli
+bin/
 /markovd
 *.exe
 

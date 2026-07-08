@@ -27,6 +27,21 @@ project = "ai-first-pipeline"
 poll_interval = "3s"
 timeout = "45m"
 output = "json"
+
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.volumes]]
+name = "workspace"
+pvc = "pipeline-workspace"
+mount_path = "/app/workspace"
+read_only = true
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +65,18 @@ output = "json"
 	}
 	if cfg.PollInterval != 3*time.Second || cfg.Timeout != 45*time.Minute {
 		t.Fatalf("durations not loaded: poll=%s timeout=%s", cfg.PollInterval, cfg.Timeout)
+	}
+	if len(cfg.DefaultVolumes) != 2 {
+		t.Fatalf("default volumes = %#v", cfg.DefaultVolumes)
+	}
+	if cfg.DefaultVolumes[0].Name != "pipeline-artifacts" || cfg.DefaultVolumes[0].MountPath != "/app/artifacts" {
+		t.Fatalf("first default volume = %#v", cfg.DefaultVolumes[0])
+	}
+	if cfg.DefaultVolumes[1].PVC != "pipeline-workspace" || !cfg.DefaultVolumes[1].ReadOnly {
+		t.Fatalf("second default volume = %#v", cfg.DefaultVolumes[1])
+	}
+	if len(cfg.DefaultSecretVolumes) != 1 || cfg.DefaultSecretVolumes[0].Name != "gcp-credentials" || !cfg.DefaultSecretVolumes[0].ReadOnly {
+		t.Fatalf("default secret volumes = %#v", cfg.DefaultSecretVolumes)
 	}
 }
 
@@ -171,6 +198,76 @@ func TestRunCreatePayloadOmitsBlankEntrypointAndSendsMounts(t *testing.T) {
 	}
 	if len(got.SecretVolumes) != 1 || got.SecretVolumes[0].Secret != "api-keys" || got.SecretVolumes[0].MountPath != "/secrets/api-keys" {
 		t.Fatalf("secret volumes = %#v", got.SecretVolumes)
+	}
+}
+
+func TestRunCreatePayloadIncludesConfigDefaultMounts(t *testing.T) {
+	var got runCreateRequest
+	client := fakeClient(func(r *http.Request) (int, any) {
+		switch r.URL.Path {
+		case "/api/v1/runs":
+			if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+				t.Fatal(err)
+			}
+			return http.StatusOK, run{RunID: "markov-run-1", WorkflowName: got.WorkflowName, Status: "pending"}
+		default:
+			return http.StatusNotFound, map[string]string{"error": "not found"}
+		}
+	})
+
+	cfg := cliConfig{
+		Output:       "json",
+		Timeout:      time.Second,
+		PollInterval: time.Millisecond,
+		DefaultVolumes: []pvcMount{
+			{Name: "pipeline-artifacts", MountPath: "/app/artifacts"},
+		},
+		DefaultSecretVolumes: []secretMount{
+			{Name: "gcp-credentials", MountPath: "/home/pipelineagent/.config/gcloud", ReadOnly: true},
+		},
+	}
+	var stdout bytes.Buffer
+	err := runRuns(context.Background(), client, cfg, []string{
+		"create", "graph-boundary-noop",
+		"--volume", "pipeline-context:/app/.context",
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Volumes) != 2 {
+		t.Fatalf("volumes = %#v", got.Volumes)
+	}
+	if got.Volumes[0].Name != "pipeline-artifacts" || got.Volumes[0].PVC != "pipeline-artifacts" || got.Volumes[0].MountPath != "/app/artifacts" {
+		t.Fatalf("default volume = %#v", got.Volumes[0])
+	}
+	if got.Volumes[1].PVC != "pipeline-context" || got.Volumes[1].MountPath != "/app/.context" {
+		t.Fatalf("cli volume = %#v", got.Volumes[1])
+	}
+	if len(got.SecretVolumes) != 1 || got.SecretVolumes[0].Secret != "gcp-credentials" || !got.SecretVolumes[0].ReadOnly {
+		t.Fatalf("secret volumes = %#v", got.SecretVolumes)
+	}
+}
+
+func TestRunCreateRejectsDuplicateConfigAndCLIMountPath(t *testing.T) {
+	client := fakeClient(func(r *http.Request) (int, any) {
+		t.Fatalf("unexpected API request to %s", r.URL.Path)
+		return http.StatusInternalServerError, nil
+	})
+	cfg := cliConfig{
+		Output:       "json",
+		Timeout:      time.Second,
+		PollInterval: time.Millisecond,
+		DefaultVolumes: []pvcMount{
+			{Name: "pipeline-artifacts", MountPath: "/app/artifacts"},
+		},
+	}
+	var stdout bytes.Buffer
+	err := runRuns(context.Background(), client, cfg, []string{
+		"create", "graph-boundary-noop",
+		"--volume", "other-pvc:/app/artifacts",
+	}, &stdout)
+	if err == nil || !strings.Contains(err.Error(), `duplicate mount path "/app/artifacts"`) {
+		t.Fatalf("expected duplicate mount path error, got %v", err)
 	}
 }
 

@@ -15,7 +15,7 @@ Plan: [Markovd CLI Plan](../../plans/003-markovd-cli.md)
 
 ## Acceptance Criteria
 
-- [x] `./bin/markovd-cli` exists and can be run from a checkout.
+- [x] `make markovd-cli` builds `./bin/markovd-cli`.
 - [x] CLI authentication works with token, environment variables, and explicit
       username/password login.
 - [x] Username/password login supports flags, environment variables,
@@ -26,6 +26,8 @@ Plan: [Markovd CLI Plan](../../plans/003-markovd-cli.md)
       `.markovd-cli-config.toml`, user config, then defaults.
 - [x] Local TOML config can define `server`, `username`, `password`, `token`,
       `ssl_verify`, and `ca_cert`.
+- [x] Local TOML config can define default PVC and Secret volume mounts for
+      `runs create`.
 - [x] HTTPS connections verify certificates by default.
 - [x] Self-signed development instances work with
       `--insecure-skip-tls-verify` or `MARKOVD_INSECURE_SKIP_TLS_VERIFY=true`.
@@ -48,7 +50,6 @@ Plan: [Markovd CLI Plan](../../plans/003-markovd-cli.md)
 
 ## Files Likely Involved
 
-- `bin/markovd-cli`
 - `cmd/markovd-cli/`
 - `internal/api/`
 - `docs/plans/003-markovd-cli.md`
@@ -56,8 +57,11 @@ Plan: [Markovd CLI Plan](../../plans/003-markovd-cli.md)
 ## Verification
 
 - `env GOCACHE=/tmp/go-build-cache go test ./cmd/markovd-cli`
+  covered config default PVC and Secret mount parsing and run payload merging.
 - `env GOCACHE=/tmp/go-build-cache go test ./...`
-- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli` printed CLI usage.
+- `env GOCACHE=/tmp/go-build-cache make markovd-cli` built
+  `./bin/markovd-cli`.
+- `./bin/markovd-cli` printed CLI usage.
 - `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --output json health`
   returned `{"status":"healthy"}`.
 - `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --username admin --password admin --output json projects list`

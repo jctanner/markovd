@@ -211,6 +211,15 @@ project = "ai-first-pipeline"
 poll_interval = "2s"
 timeout = "30m"
 output = "table"
+
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
 ```
 
 Equivalent token-based config:
@@ -242,6 +251,8 @@ Config field mapping:
 - `defaults.timeout`: same as `--timeout`
 - `defaults.project`: default project name for project-oriented commands when
   the command can safely infer it
+- `defaults.volumes`: default PVC mounts for `runs create`
+- `defaults.secret_volumes`: default Secret mounts for `runs create`
 
 Security expectations:
 
@@ -330,8 +341,8 @@ Place the executable at `./bin/markovd-cli`.
 
 Preferred implementation options:
 
-- Go command under `cmd/markovd-cli` with `bin/markovd-cli` as a small wrapper
-  that runs or builds it.
+- Go command under `cmd/markovd-cli` with `make markovd-cli` building the
+  ignored local binary at `bin/markovd-cli`.
 - Go keeps dependency and distribution behavior aligned with the backend.
 - Use the standard `net/http` client unless a lightweight CLI package is
   already present or deliberately introduced.
@@ -400,8 +411,8 @@ printf '%s\n' admin | ./bin/markovd-cli --server https://markovd.local \
 
 ## Open Questions
 
-- Should `./bin/markovd-cli` be a compiled binary committed by release
-  packaging, or a wrapper that executes `go run ./cmd/markovd-cli` in the repo?
+- Should release packaging ship a prebuilt `markovd-cli` artifact, or should
+  users build from source with `make markovd-cli`?
 - Should `runs create --logs --wait` stream Kubernetes job logs, Markov callback
   logs, or both?
 - Should workflow import have a dedicated command that combines project file

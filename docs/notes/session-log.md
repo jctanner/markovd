@@ -330,3 +330,43 @@ Verified:
 - `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --help`
 - `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli -h`
 - `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli help`
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Replaced the tracked `bin/markovd-cli` Bash wrapper approach with a
+  Make-built binary workflow.
+- Added `make markovd-cli` and updated `make build` to build both `markovd`
+  and `markovd-cli`.
+- Restored `bin/` as an ignored build-artifact directory.
+- Updated the CLI reference, implementation plan, and done task to document
+  that `bin/markovd-cli` is built locally.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache make markovd-cli`
+  built `bin/markovd-cli`.
+- `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache go test ./cmd/markovd-cli`
+- From `/home/jtanner/workspace/github/jctanner.redhat/ai-first-pipeline`,
+  `./deploy/repos/markovd/bin/markovd-cli --help` printed usage successfully.
+- `file bin/markovd-cli` reported an ELF executable.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Added `[[defaults.volumes]]` and `[[defaults.secret_volumes]]` support to
+  `.markovd-cli-config.toml`.
+- `runs create` now includes configured default PVC and Secret mounts and
+  appends any explicit `--volume` or `--secret-volume` flags.
+- Duplicate mount paths across config defaults and command-line mounts are
+  rejected.
+- Updated the CLI reference, CLI plan, and done task with default mount config
+  examples and behavior.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache go test ./cmd/markovd-cli`
+- `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache go test ./...`
+- `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache make markovd-cli`

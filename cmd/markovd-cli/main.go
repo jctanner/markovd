@@ -43,20 +43,24 @@ type cliConfig struct {
 	InsecureExplicitlySet bool
 	CACert                string
 	DefaultProject        string
+	DefaultVolumes        []pvcMount
+	DefaultSecretVolumes  []secretMount
 	PasswordStdin         bool
 }
 
 type rawConfig struct {
-	Server        string
-	Username      string
-	Password      string
-	Token         string
-	SSLVerify     *bool
-	CACert        string
-	DefaultOutput string
-	DefaultPoll   string
-	DefaultTO     string
-	DefaultProj   string
+	Server               string
+	Username             string
+	Password             string
+	Token                string
+	SSLVerify            *bool
+	CACert               string
+	DefaultOutput        string
+	DefaultPoll          string
+	DefaultTO            string
+	DefaultProj          string
+	DefaultVolumes       []pvcMount
+	DefaultSecretVolumes []secretMount
 }
 
 type apiClient struct {
@@ -496,6 +500,16 @@ func parseConfigTOML(s string) (rawConfig, error) {
 		if line == "" {
 			continue
 		}
+		if strings.HasPrefix(line, "[[") && strings.HasSuffix(line, "]]") {
+			section = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "[["), "]]"))
+			switch section {
+			case "defaults.volumes":
+				cfg.DefaultVolumes = append(cfg.DefaultVolumes, pvcMount{})
+			case "defaults.secret_volumes":
+				cfg.DefaultSecretVolumes = append(cfg.DefaultSecretVolumes, secretMount{})
+			}
+			continue
+		}
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			section = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
 			continue
@@ -533,6 +547,36 @@ func parseConfigTOML(s string) (rawConfig, error) {
 				cfg.DefaultTO = parseString(val)
 			case "project":
 				cfg.DefaultProj = parseString(val)
+			}
+		case "defaults.volumes":
+			if len(cfg.DefaultVolumes) == 0 {
+				cfg.DefaultVolumes = append(cfg.DefaultVolumes, pvcMount{})
+			}
+			vol := &cfg.DefaultVolumes[len(cfg.DefaultVolumes)-1]
+			switch key {
+			case "name":
+				vol.Name = parseString(val)
+			case "pvc":
+				vol.PVC = parseString(val)
+			case "mount_path", "mount":
+				vol.MountPath = parseString(val)
+			case "read_only":
+				vol.ReadOnly = parseBool(val)
+			}
+		case "defaults.secret_volumes":
+			if len(cfg.DefaultSecretVolumes) == 0 {
+				cfg.DefaultSecretVolumes = append(cfg.DefaultSecretVolumes, secretMount{})
+			}
+			secret := &cfg.DefaultSecretVolumes[len(cfg.DefaultSecretVolumes)-1]
+			switch key {
+			case "name":
+				secret.Name = parseString(val)
+			case "secret":
+				secret.Secret = parseString(val)
+			case "mount_path", "mount":
+				secret.MountPath = parseString(val)
+			case "read_only":
+				secret.ReadOnly = parseBool(val)
 			}
 		}
 	}
@@ -611,6 +655,12 @@ func mergeRawConfig(cfg *cliConfig, raw rawConfig) {
 	}
 	if raw.DefaultProj != "" {
 		cfg.DefaultProject = raw.DefaultProj
+	}
+	if len(raw.DefaultVolumes) > 0 {
+		cfg.DefaultVolumes = raw.DefaultVolumes
+	}
+	if len(raw.DefaultSecretVolumes) > 0 {
+		cfg.DefaultSecretVolumes = raw.DefaultSecretVolumes
 	}
 }
 
@@ -1201,11 +1251,11 @@ func runCreateRun(ctx context.Context, c *apiClient, cfg cliConfig, args []strin
 	if err != nil {
 		return err
 	}
-	pvcs, err := parsePVCMounts(volumes)
+	pvcs, err := mergePVCMounts(cfg.DefaultVolumes, volumes)
 	if err != nil {
 		return err
 	}
-	secrets, err := parseSecretMounts(secretVolumes)
+	secrets, err := mergeSecretMounts(cfg.DefaultSecretVolumes, secretVolumes)
 	if err != nil {
 		return err
 	}
@@ -1295,9 +1345,20 @@ func parseVars(items []string, varsFile string) (map[string]string, error) {
 	return out, nil
 }
 
-func parsePVCMounts(items []string) ([]pvcMount, error) {
+func mergePVCMounts(defaults []pvcMount, items []string) ([]pvcMount, error) {
 	seen := map[string]bool{}
 	var out []pvcMount
+	for _, vol := range defaults {
+		normalized, err := normalizePVCMount(vol)
+		if err != nil {
+			return nil, err
+		}
+		if seen[normalized.MountPath] {
+			return nil, fmt.Errorf("duplicate mount path %q", normalized.MountPath)
+		}
+		seen[normalized.MountPath] = true
+		out = append(out, normalized)
+	}
 	for _, item := range items {
 		name, mount, err := parseMount(item)
 		if err != nil {
@@ -1312,9 +1373,20 @@ func parsePVCMounts(items []string) ([]pvcMount, error) {
 	return out, nil
 }
 
-func parseSecretMounts(items []string) ([]secretMount, error) {
+func mergeSecretMounts(defaults []secretMount, items []string) ([]secretMount, error) {
 	seen := map[string]bool{}
 	var out []secretMount
+	for _, secret := range defaults {
+		normalized, err := normalizeSecretMount(secret)
+		if err != nil {
+			return nil, err
+		}
+		if seen[normalized.MountPath] {
+			return nil, fmt.Errorf("duplicate mount path %q", normalized.MountPath)
+		}
+		seen[normalized.MountPath] = true
+		out = append(out, normalized)
+	}
 	for _, item := range items {
 		name, mount, err := parseMount(item)
 		if err != nil {
@@ -1327,6 +1399,44 @@ func parseSecretMounts(items []string) ([]secretMount, error) {
 		out = append(out, secretMount{Name: strings.ReplaceAll(name, "/", "-"), Secret: name, MountPath: mount})
 	}
 	return out, nil
+}
+
+func normalizePVCMount(vol pvcMount) (pvcMount, error) {
+	if vol.PVC == "" {
+		vol.PVC = vol.Name
+	}
+	if vol.Name == "" {
+		vol.Name = strings.ReplaceAll(vol.PVC, "/", "-")
+	}
+	if vol.PVC == "" || vol.Name == "" {
+		return vol, errors.New("default volume requires name or pvc")
+	}
+	if vol.MountPath == "" {
+		return vol, fmt.Errorf("default volume %q requires mount_path", vol.Name)
+	}
+	if !strings.HasPrefix(vol.MountPath, "/") {
+		return vol, fmt.Errorf("default volume %q mount_path must be absolute: %q", vol.Name, vol.MountPath)
+	}
+	return vol, nil
+}
+
+func normalizeSecretMount(secret secretMount) (secretMount, error) {
+	if secret.Secret == "" {
+		secret.Secret = secret.Name
+	}
+	if secret.Name == "" {
+		secret.Name = strings.ReplaceAll(secret.Secret, "/", "-")
+	}
+	if secret.Secret == "" || secret.Name == "" {
+		return secret, errors.New("default secret volume requires name or secret")
+	}
+	if secret.MountPath == "" {
+		return secret, fmt.Errorf("default secret volume %q requires mount_path", secret.Name)
+	}
+	if !strings.HasPrefix(secret.MountPath, "/") {
+		return secret, fmt.Errorf("default secret volume %q mount_path must be absolute: %q", secret.Name, secret.MountPath)
+	}
+	return secret, nil
 }
 
 func parseMount(item string) (string, string, error) {

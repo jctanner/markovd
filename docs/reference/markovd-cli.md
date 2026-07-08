@@ -5,6 +5,23 @@ intended for local terminal use, CI jobs, and automation that needs to sync
 projects, import workflows, trigger runs, and wait for results without using the
 browser UI.
 
+## Build
+
+Build the CLI binary from the markovd checkout:
+
+```bash
+make markovd-cli
+```
+
+This writes `bin/markovd-cli`. The `bin/` directory is ignored by Git, so the
+CLI binary is a local build artifact rather than a tracked wrapper script.
+
+Build both the API server and CLI:
+
+```bash
+make build
+```
+
 ## Quick Start
 
 Check the API health endpoint:
@@ -232,6 +249,19 @@ project = "ai-first-pipeline"
 poll_interval = "2s"
 timeout = "30m"
 output = "table"
+
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.volumes]]
+name = "pipeline-context"
+mount_path = "/app/.context"
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
 ```
 
 Token-based config:
@@ -269,6 +299,39 @@ Supported `[defaults]` fields:
 `defaults.project` is parsed and retained for future project-oriented command
 defaults. Current project commands still require an explicit project ID or
 name.
+
+Supported default mount sections:
+
+```toml
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.volumes]]
+name = "workspace-volume"
+pvc = "pipeline-workspace"
+mount_path = "/app/workspace"
+read_only = true
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
+
+[[defaults.secret_volumes]]
+name = "cloud-creds-volume"
+secret = "gcp-credentials"
+mount_path = "/var/run/gcp"
+```
+
+For `defaults.volumes`, `name` is used as the PVC name when `pvc` is omitted.
+For `defaults.secret_volumes`, `name` is used as the Secret name when `secret`
+is omitted. `mount_path` must be absolute. `read_only` is optional.
+
+`runs create` sends configured default mounts automatically. Explicit
+`--volume` and `--secret-volume` flags are appended for that run. Duplicate
+mount paths are rejected so a config default cannot silently collide with a
+command-line mount.
 
 Security notes:
 
@@ -489,6 +552,33 @@ Mount syntax is strict:
 - absolute mount path
 - duplicate mount paths are rejected
 
+Default mounts from config are included automatically:
+
+```toml
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
+```
+
+With that config, this command sends both default mounts:
+
+```bash
+./bin/markovd-cli runs create var-demos-end-to-end --wait
+```
+
+You can still add run-specific mounts:
+
+```bash
+./bin/markovd-cli runs create var-demos-end-to-end \
+  --volume pipeline-context:/app/.context \
+  --wait
+```
+
 Trigger and wait:
 
 ```bash
@@ -591,6 +681,15 @@ ssl_verify = false
 timeout = "30m"
 poll_interval = "2s"
 output = "table"
+
+[[defaults.volumes]]
+name = "pipeline-artifacts"
+mount_path = "/app/artifacts"
+
+[[defaults.secret_volumes]]
+name = "gcp-credentials"
+mount_path = "/home/pipelineagent/.config/gcloud"
+read_only = true
 EOF
 
 ./bin/markovd-cli projects list
