@@ -175,3 +175,27 @@ Verified:
   internals at `x=680`.
 - `npm run build` in `ui/`.
 - `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Implemented Phase 1 of the Run Graph Workflow Boundaries plan.
+- Added non-interactive workflow boundary nodes behind nested Run Detail graph
+  steps, derived from exact `fork_id` workflow scopes.
+- Styled workflow boundaries with quiet dashed containers and compact labels.
+- Recorded screenshot evidence in
+  `docs/plans/run-graph-workflow-boundaries.png`.
+
+Verified:
+- Playwright against `http://127.0.0.1:5173/runs/markov-run-b09c12f9`
+  rendered 9 workflow boundary nodes for the end-to-end nested workflow run.
+- Playwright containment checks confirmed representative child steps were
+  inside `run_pipeline`, nested `run_pipeline-*`, and `reset_github`
+  boundaries.
+- Playwright confirmed step clicks still open `StepDetailModal`.
+- Playwright against `markov-run-a25ff450` confirmed a step with top-level
+  `output_json.job_name` still shows a Logs section in the modal.
+- `npm run build` in `ui/`.
+- `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.

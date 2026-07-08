@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css';
 import type { Step } from '../api';
 
 const NODE_H = 72;
+const NODE_W = 294;
 const SUMMARY_NODE_H = 96;
 const NODE_GAP_Y = 60;
 const FORK_GAP_X = 280;
@@ -22,6 +23,9 @@ const CHILD_GAP_X = 340;
 const START_Y = 40;
 const START_X = 0;
 const COLLAPSE_THRESHOLD = 5;
+const GROUP_PAD_X = 44;
+const GROUP_PAD_TOP = 38;
+const GROUP_PAD_BOTTOM = 28;
 
 type StepNodeData = {
   label: string;
@@ -43,6 +47,12 @@ type ForkSummaryData = {
   failed: number;
   skipped: number;
   pending: number;
+};
+
+type WorkflowGroupData = {
+  label: string;
+  workflowName: string;
+  depth: number;
 };
 
 const statusBorder: Record<string, string> = {
@@ -166,6 +176,19 @@ function ForkSummaryNode({ data }: NodeProps<Node<ForkSummaryData>>) {
   );
 }
 
+function WorkflowGroupNode({ data }: NodeProps<Node<WorkflowGroupData>>) {
+  return (
+    <div className={`workflow-group-node workflow-group-depth-${Math.min(data.depth, 4)}`}>
+      <div className="workflow-group-label" title={data.label}>
+        <span className="workflow-group-path">{data.label}</span>
+        {data.workflowName && data.workflowName !== data.label && (
+          <span className="workflow-group-name">{data.workflowName}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function iconSvg(name: string) {
   const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (name) {
@@ -199,6 +222,7 @@ function iconSvg(name: string) {
 }
 
 function miniMapColor(node: Node): string {
+  if (node.type === 'workflowGroup') return 'rgba(14, 165, 233, 0.25)';
   const d = node.data as Record<string, unknown>;
   const status = (d.status as string) || '';
   const map: Record<string, string> = {
@@ -228,7 +252,7 @@ function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
   );
 }
 
-const nodeTypes = { step: StepNode, forkSummary: ForkSummaryNode };
+const nodeTypes = { step: StepNode, forkSummary: ForkSummaryNode, workflowGroup: WorkflowGroupNode };
 
 // ─── Branch status helpers ─────────────────────────────────────────
 
@@ -417,6 +441,14 @@ interface CollapsedForkMeta {
   forkIds: string[];
 }
 
+interface NodeBounds {
+  path: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function buildGraph(
   steps: Step[],
 ): { nodes: Node[]; edges: Edge[]; stepMap: Map<string, Step>; collapsedForks: Map<string, CollapsedForkMeta> } {
@@ -432,6 +464,7 @@ function buildGraph(
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
+  const nodeBounds: NodeBounds[] = [];
   const collapsedForks = new Map<string, CollapsedForkMeta>();
 
   function childPath(path: string, stepName: string): string {
@@ -444,6 +477,20 @@ function buildGraph(
 
   function displayForkLabel(path: string): string {
     return path;
+  }
+
+  function pathDepth(path: string): number {
+    return path ? path.split('-').length : 0;
+  }
+
+  function workflowLabel(path: string): { label: string; workflowName: string } {
+    const chain = groups.get(path) || [];
+    const workflowName = chain.find(s => s.workflow_name)?.workflow_name || '';
+    return { label: path, workflowName };
+  }
+
+  function trackNodeBounds(path: string, x: number, y: number, height: number) {
+    nodeBounds.push({ path, x, y, width: NODE_W, height });
   }
 
   function findForEachForks(forkPrefix: string): string[] {
@@ -512,6 +559,7 @@ function buildGraph(
         },
         draggable: false,
       });
+      trackNodeBounds(path, x, y, NODE_H);
       chainNodeIds.push(nodeId);
       chainSteps.push(step);
       y += NODE_H + NODE_GAP_Y;
@@ -575,6 +623,7 @@ function buildGraph(
             },
             draggable: false,
           });
+          trackNodeBounds(path, x, y, SUMMARY_NODE_H);
 
           edges.push({
             id: `${nodeId}-fork->${summaryId}`,
@@ -667,7 +716,44 @@ function buildGraph(
 
   layoutChain('', START_X, START_Y);
 
-  return { nodes, edges, stepMap, collapsedForks };
+  const groupNodes: Node[] = [];
+  const pathsByDepth = Array.from(groups.keys())
+    .filter(path => path !== '')
+    .sort((a, b) => pathDepth(a) - pathDepth(b));
+
+  for (const path of pathsByDepth) {
+    const scoped = nodeBounds.filter(b => b.path === path || b.path.startsWith(path + '-'));
+    if (scoped.length === 0) continue;
+
+    const minX = Math.min(...scoped.map(b => b.x));
+    const minY = Math.min(...scoped.map(b => b.y));
+    const maxX = Math.max(...scoped.map(b => b.x + b.width));
+    const maxY = Math.max(...scoped.map(b => b.y + b.height));
+    const depth = pathDepth(path);
+    const { label, workflowName } = workflowLabel(path);
+
+    groupNodes.push({
+      id: `group::${path}`,
+      type: 'workflowGroup',
+      position: {
+        x: minX - GROUP_PAD_X,
+        y: minY - GROUP_PAD_TOP,
+      },
+      data: { label, workflowName, depth },
+      style: {
+        width: maxX - minX + GROUP_PAD_X * 2,
+        height: maxY - minY + GROUP_PAD_TOP + GROUP_PAD_BOTTOM,
+        pointerEvents: 'none',
+      },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      focusable: false,
+      zIndex: -depth,
+    });
+  }
+
+  return { nodes: [...groupNodes, ...nodes], edges, stepMap, collapsedForks };
 }
 
 // ─── Color mode hook ───────────────────────────────────────────────
@@ -701,7 +787,13 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y), 0);
-  const graphHeight = Math.max(300, maxY + NODE_H + 80);
+  const graphHeight = Math.max(
+    300,
+    nodes.reduce((m, n) => {
+      const height = typeof n.style?.height === 'number' ? n.style.height : NODE_H;
+      return Math.max(m, n.position.y + height);
+    }, maxY) + 80,
+  );
 
   const onInit = useCallback((instance: { fitView: () => void }) => {
     setTimeout(() => instance.fitView(), 50);

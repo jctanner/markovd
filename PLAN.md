@@ -7,6 +7,7 @@ bugs, decisions, and operational notes live under `docs/`.
 
 - [Project overview](docs/plans/000-overview.md)
 - [Workflow input formats plan](docs/plans/001-workflow-input-formats.md)
+- [Run graph workflow boundaries plan](docs/plans/002-run-graph-workflow-boundaries.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
 - [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
 
