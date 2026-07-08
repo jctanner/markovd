@@ -238,3 +238,95 @@ Verified:
   errors.
 - `npm run build` in `ui/`.
 - `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Added `docs/plans/003-markovd-cli.md`, a plan for `./bin/markovd-cli` with
+  full API CRUD coverage and primary flows for project sync/wait and workflow
+  trigger/wait.
+- Added `docs/tasks/pending/markovd-cli.md` so the implementation has a ledger
+  task.
+- Linked the plan and pending task from `PLAN.md`.
+- Tightened the CLI plan and task requirements for easy username/password
+  login, `--password-stdin`, self-signed certificate support, and custom CA
+  trust.
+- Added project-local TOML config support to the CLI plan:
+  `./.markovd-cli-config.toml` can hold instance URL, credentials, TLS
+  verification behavior, custom CA path, and command defaults.
+- Corrected `PLAN.md` so the CLI task is listed as pending, matching its
+  filesystem ledger location.
+
+Verified:
+- Reviewed current API routes in `internal/api/router.go`,
+  `internal/api/projects.go`, `internal/api/runs.go`, and
+  `internal/api/workflows.go` to map CLI commands to existing endpoints.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Implemented `./bin/markovd-cli` as a wrapper around the Go command in
+  `cmd/markovd-cli`.
+- Added a markovd API client with token injection, username/password login,
+  JSON error decoding, TLS verification by default, self-signed certificate
+  opt-out, and custom CA support.
+- Added TOML config loading for `./.markovd-cli-config.toml`, explicit
+  `--config`, and user config with precedence below environment variables and
+  CLI flags.
+- Implemented project, workflow, run, PVC, Secret, and preferences commands
+  from the CLI plan, including `projects sync --wait` and
+  `runs create --workflow ... --wait`.
+- Added strict PVC and Secret mount parsing for `NAME:/absolute/path`.
+- Added `.markovd-cli-config.toml` to `.gitignore` to reduce accidental
+  credential commits.
+- Moved the CLI task to `docs/tasks/done/markovd-cli.md`.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./cmd/markovd-cli`
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli` printed CLI usage.
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --output json health`
+  returned healthy.
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --username admin --password admin --output json projects list`
+  authenticated and listed projects.
+- `printf '%s\n' admin | env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --username admin --password-stdin --output json auth login`
+  authenticated through standard input.
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --server https://markovd.local --insecure-skip-tls-verify --username admin --password admin --timeout 2m --poll-interval 2s runs create graph-boundary-noop --workflow pipeline --wait`
+  triggered `markov-run-cfb29a83` and waited until it completed.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Added `docs/reference/markovd-cli.md`, a full user reference for
+  `./bin/markovd-cli`.
+- Documented authentication, environment variables, self-signed TLS handling,
+  local TOML config, output formats, project/workflow/run commands, volume
+  mounts, wait behavior, exit codes, and common recipes.
+- Linked the CLI reference from `PLAN.md`.
+- Updated `preferences set` so JSON-looking values are sent as JSON arrays or
+  objects, matching the documented default volume example.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./cmd/markovd-cli`
+- `git diff --check`
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Fixed `./bin/markovd-cli --help`, `./bin/markovd-cli -h`, and
+  `./bin/markovd-cli help` so they print usage and exit successfully.
+- Added a regression test for all three help forms.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./cmd/markovd-cli`
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli --help`
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli -h`
+- `env GOCACHE=/tmp/go-build-cache ./bin/markovd-cli help`

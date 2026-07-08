@@ -1,5 +1,6 @@
 # Binaries
-bin/
+/bin/*
+!/bin/markovd-cli
 /markovd
 *.exe
 
@@ -29,6 +30,7 @@ Thumbs.db
 # Environment / secrets
 .env
 .env.*
+.markovd-cli-config.toml
 kubeconfig.yaml
 
 # Plans / scratch

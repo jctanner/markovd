@@ -8,6 +8,7 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Project overview](docs/plans/000-overview.md)
 - [Workflow input formats plan](docs/plans/001-workflow-input-formats.md)
 - [Run graph workflow boundaries plan](docs/plans/002-run-graph-workflow-boundaries.md)
+- [Markovd CLI plan](docs/plans/003-markovd-cli.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
 - [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
 
@@ -34,6 +35,7 @@ None.
 - [Update workflow API and UI for file and directory definitions](docs/tasks/done/workflow-definition-api-ux.md)
 - [Support diagrams for directory workflow definitions](docs/tasks/done/workflow-definition-diagrams.md)
 - [Verify workflow definition formats end to end](docs/tasks/done/workflow-definition-e2e-verification.md)
+- [Add Markovd API CLI](docs/tasks/done/markovd-cli.md)
 
 ## Open Bugs
 
@@ -56,6 +58,7 @@ None.
 
 ## Operational Notes
 
+- [Markovd CLI reference](docs/reference/markovd-cli.md)
 - [Accessing a running instance](docs/notes/accessing-running-instance.md)
 - [Kubernetes admin credentials](docs/notes/k8s-admin-credentials.md)
 - [Kubernetes job support requirements](docs/notes/k8s-job-support.md)
