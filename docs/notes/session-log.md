@@ -199,3 +199,42 @@ Verified:
   `output_json.job_name` still shows a Logs section in the modal.
 - `npm run build` in `ui/`.
 - `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Added `docs/fixtures/workflows/graph-boundary-noop/`, a fast no-op directory
+  workflow for reproducing Run Detail graph boundary label and edge crowding
+  issues without running the full ai-first-pipeline end-to-end demo.
+- Updated the open graph boundary overlap bug to use this fixture as the
+  preferred reproducer.
+
+Verified:
+- `../markov/bin/markov validate docs/fixtures/workflows/graph-boundary-noop`
+- `../markov/bin/markov run docs/fixtures/workflows/graph-boundary-noop --state-store /tmp/markovd-graph-boundary-noop-2.db --run-id graph-boundary-noop-smoke-2 --verbose`
+
+## 2026-07-08
+
+Agent: codex
+
+Completed:
+- Fixed the Run Detail workflow boundary label overlap bug using the fast no-op
+  graph fixture instead of the slow ai-first-pipeline end-to-end demo.
+- Stopped rendering workflow boundary containers around expanded `for_each`
+  branch paths while preserving boundaries around actual workflow calls.
+- Added clearer workflow boundary label separation and more header padding.
+- Moved the bug record to `docs/bugs/fixed/` with Playwright screenshot
+  evidence.
+
+Verified:
+- `../markov/bin/markov validate docs/fixtures/workflows/graph-boundary-noop`
+- `../markov/bin/markov run docs/fixtures/workflows/graph-boundary-noop --state-store /tmp/markovd-graph-boundary-noop-3.db --run-id graph-boundary-noop-smoke-3 --verbose`
+- Imported `graph-boundary-noop` into `markovd.local` and triggered
+  `markov-run-a8dc339b`, which completed with 34 steps.
+- Playwright rendered `markov-run-a8dc339b` on the Graph tab through the local
+  Vite frontend and found no workflow boundary label overlaps or console
+  errors.
+- `npm run build` in `ui/`.
+- `npx eslint src/components/WorkflowGraph.tsx` in `ui/`.

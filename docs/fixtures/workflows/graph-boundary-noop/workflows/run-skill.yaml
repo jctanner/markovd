@@ -1,0 +1,9 @@
+name: run-skill
+description: "No-op helper workflow shaped like a submit/wait pair"
+
+steps:
+  - name: submit
+    type: noop
+
+  - name: wait_for_completion
+    type: noop

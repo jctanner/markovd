@@ -1,0 +1,9 @@
+name: setup
+description: "Small sequential setup scope"
+
+steps:
+  - name: reset_services
+    type: noop
+
+  - name: clear_volumes
+    type: noop

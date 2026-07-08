@@ -1,0 +1,12 @@
+name: import-repo
+description: "No-op import branch with stacked steps"
+
+steps:
+  - name: delete_repo
+    type: noop
+
+  - name: start_import
+    type: noop
+
+  - name: poll_import
+    type: noop

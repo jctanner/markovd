@@ -24,8 +24,8 @@ const START_Y = 40;
 const START_X = 0;
 const COLLAPSE_THRESHOLD = 5;
 const GROUP_PAD_X = 44;
-const GROUP_PAD_TOP = 38;
-const GROUP_PAD_BOTTOM = 28;
+const GROUP_PAD_TOP = 64;
+const GROUP_PAD_BOTTOM = 34;
 
 type StepNodeData = {
   label: string;
@@ -52,6 +52,7 @@ type ForkSummaryData = {
 type WorkflowGroupData = {
   label: string;
   workflowName: string;
+  branchKey: string;
   depth: number;
 };
 
@@ -180,8 +181,11 @@ function WorkflowGroupNode({ data }: NodeProps<Node<WorkflowGroupData>>) {
   return (
     <div className={`workflow-group-node workflow-group-depth-${Math.min(data.depth, 4)}`}>
       <div className="workflow-group-label" title={data.label}>
-        <span className="workflow-group-path">{data.label}</span>
-        {data.workflowName && data.workflowName !== data.label && (
+        <span className="workflow-group-path">{data.branchKey || data.label}</span>
+        {data.workflowName && data.workflowName !== data.branchKey && data.workflowName !== data.label && (
+          <span className="workflow-group-separator">/</span>
+        )}
+        {data.workflowName && data.workflowName !== data.branchKey && data.workflowName !== data.label && (
           <span className="workflow-group-name">{data.workflowName}</span>
         )}
       </div>
@@ -465,6 +469,7 @@ function buildGraph(
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   const nodeBounds: NodeBounds[] = [];
+  const expandedForkBranchPaths = new Set<string>();
   const collapsedForks = new Map<string, CollapsedForkMeta>();
 
   function childPath(path: string, stepName: string): string {
@@ -483,10 +488,15 @@ function buildGraph(
     return path ? path.split('-').length : 0;
   }
 
-  function workflowLabel(path: string): { label: string; workflowName: string } {
+  function branchKey(path: string): string {
+    const parts = path.split('-');
+    return parts[parts.length - 1] || path;
+  }
+
+  function workflowLabel(path: string): { label: string; workflowName: string; branchKey: string } {
     const chain = groups.get(path) || [];
     const workflowName = chain.find(s => s.workflow_name)?.workflow_name || '';
-    return { label: path, workflowName };
+    return { label: path, workflowName, branchKey: branchKey(path) };
   }
 
   function trackNodeBounds(path: string, x: number, y: number, height: number) {
@@ -650,6 +660,9 @@ function buildGraph(
           }
         } else {
           // Expanded fork columns
+          for (const forkId of forkIds) {
+            expandedForkBranchPaths.add(forkId);
+          }
           const forkStartY = y;
           const totalWidth = (forkIds.length - 1) * FORK_GAP_X;
           const forkBaseX = x - totalWidth / 2;
@@ -722,6 +735,7 @@ function buildGraph(
     .sort((a, b) => pathDepth(a) - pathDepth(b));
 
   for (const path of pathsByDepth) {
+    if (expandedForkBranchPaths.has(path)) continue;
     const scoped = nodeBounds.filter(b => b.path === path || b.path.startsWith(path + '-'));
     if (scoped.length === 0) continue;
 
@@ -730,7 +744,7 @@ function buildGraph(
     const maxX = Math.max(...scoped.map(b => b.x + b.width));
     const maxY = Math.max(...scoped.map(b => b.y + b.height));
     const depth = pathDepth(path);
-    const { label, workflowName } = workflowLabel(path);
+    const { label, workflowName, branchKey } = workflowLabel(path);
 
     groupNodes.push({
       id: `group::${path}`,
@@ -739,7 +753,7 @@ function buildGraph(
         x: minX - GROUP_PAD_X,
         y: minY - GROUP_PAD_TOP,
       },
-      data: { label, workflowName, depth },
+      data: { label, workflowName, branchKey, depth },
       style: {
         width: maxX - minX + GROUP_PAD_X * 2,
         height: maxY - minY + GROUP_PAD_TOP + GROUP_PAD_BOTTOM,

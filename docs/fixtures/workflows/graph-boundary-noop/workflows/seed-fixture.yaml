@@ -1,0 +1,6 @@
+name: seed-fixture
+description: "Small child workflow to expose arrow/header crowding"
+
+steps:
+  - name: create_fixture
+    type: noop

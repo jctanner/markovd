@@ -1,0 +1,23 @@
+name: pipeline
+description: "Nested pipeline scope with repeated helper workflow calls"
+
+steps:
+  - name: rfe_speedrun
+    workflow: run-skill
+    vars:
+      skill_name: rfe_speedrun
+
+  - name: rfe_submit
+    workflow: run-skill
+    vars:
+      skill_name: rfe_submit
+
+  - name: strat_create
+    workflow: run-skill
+    vars:
+      skill_name: strat_create
+
+  - name: strat_refine
+    workflow: run-skill
+    vars:
+      skill_name: strat_refine

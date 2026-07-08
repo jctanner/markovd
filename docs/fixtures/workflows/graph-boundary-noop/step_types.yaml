@@ -1,0 +1,4 @@
+noop:
+  base: shell_exec
+  defaults:
+    command: "true"

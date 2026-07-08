@@ -1,0 +1,19 @@
+name: fanout-parent
+description: "Expanded fan-out with long branch keys"
+
+steps:
+  - name: create_repos
+    type: noop
+
+  - name: process_repos
+    for_each: repo_items
+    for_each_key: "name"
+    for_each_sort: "name"
+    as: repo
+    concurrency: 4
+    workflow: import-repo
+    vars:
+      repo_name: "{{ repo.name }}"
+
+  - name: summarize_repos
+    type: noop

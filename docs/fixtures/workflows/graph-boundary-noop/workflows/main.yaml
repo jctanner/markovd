@@ -1,0 +1,15 @@
+name: main
+description: "Fast graph boundary repro workflow"
+
+steps:
+  - name: setup
+    workflow: setup
+
+  - name: fanout_parent
+    workflow: fanout-parent
+
+  - name: seed_fixture
+    workflow: seed-fixture
+
+  - name: pipeline
+    workflow: pipeline
