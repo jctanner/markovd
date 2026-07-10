@@ -203,6 +203,9 @@ func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, e
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyNever,
 					ServiceAccountName: r.serviceAccount,
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup: func() *int64 { v := int64(1000); return &v }(),
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "markov",
