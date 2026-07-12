@@ -13,6 +13,7 @@ import {
 import type { Node, Edge, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Step } from '../api';
+import { resolveFollowTarget } from './workflowGraphFollow';
 
 const NODE_H = 72;
 const NODE_W = 294;
@@ -220,6 +221,8 @@ function iconSvg(name: string) {
       return <svg {...props}><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
     case 'arrow-down':
       return <svg {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>;
+    case 'locate':
+      return <svg {...props}><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="8" /><line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="22" /><line x1="2" y1="12" x2="4" y2="12" /><line x1="20" y1="12" x2="22" y2="12" /></svg>;
     default:
       return <svg {...props}><circle cx="12" cy="12" r="4" /></svg>;
   }
@@ -252,6 +255,51 @@ function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
   return (
     <button className="graph-jump-btn" onClick={jump} title="Jump to bottom">
       {iconSvg('arrow-down')}
+    </button>
+  );
+}
+
+interface FollowRunningButtonProps {
+  nodes: Node[];
+  targetId: string | null;
+}
+
+function FollowRunningButton({ nodes, targetId }: FollowRunningButtonProps) {
+  const { getZoom, setCenter } = useReactFlow();
+  const [enabled, setEnabled] = useState(false);
+  const lastTargetRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      lastTargetRef.current = null;
+      return;
+    }
+    if (!targetId || targetId === lastTargetRef.current) return;
+
+    const node = nodes.find(candidate => candidate.id === targetId);
+    if (!node) return;
+
+    const width = node.measured?.width ?? NODE_W;
+    const fallbackHeight = node.type === 'forkSummary' ? SUMMARY_NODE_H : NODE_H;
+    const height = node.measured?.height ?? fallbackHeight;
+    setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: getZoom(),
+      duration: 400,
+    });
+    lastTargetRef.current = targetId;
+  }, [enabled, getZoom, nodes, setCenter, targetId]);
+
+  const label = enabled ? 'Stop following running step' : 'Follow running step';
+  return (
+    <button
+      type="button"
+      className={`graph-follow-btn${enabled ? ' active' : ''}`}
+      onClick={() => setEnabled(current => !current)}
+      title={label}
+      aria-label={label}
+      aria-pressed={enabled}
+    >
+      {iconSvg('locate')}
     </button>
   );
 }
@@ -455,10 +503,11 @@ interface NodeBounds {
 
 function buildGraph(
   steps: Step[],
-): { nodes: Node[]; edges: Edge[]; stepMap: Map<string, Step>; collapsedForks: Map<string, CollapsedForkMeta> } {
-  if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map(), collapsedForks: new Map() };
+): { nodes: Node[]; edges: Edge[]; stepMap: Map<string, Step>; collapsedForks: Map<string, CollapsedForkMeta>; followNodeByStepId: Map<number, string> } {
+  if (steps.length === 0) return { nodes: [], edges: [], stepMap: new Map(), collapsedForks: new Map(), followNodeByStepId: new Map() };
 
   const stepMap = new Map<string, Step>();
+  const followNodeByStepId = new Map<number, string>();
   const groups = new Map<string, Step[]>();
   for (const step of steps) {
     const fid = step.fork_id || '';
@@ -553,6 +602,7 @@ function buildGraph(
       const forkPrefix = childPath(path, step.step_name);
       const nodeId = nodeIdFor(path, step.step_name);
       stepMap.set(nodeId, step);
+      followNodeByStepId.set(step.id, nodeId);
       nodes.push({
         id: nodeId,
         type: 'step',
@@ -620,6 +670,10 @@ function buildGraph(
           const overallStatus = counts.running > 0 ? 'running' : counts.failed > 0 ? 'failed' : counts.completed === forkIds.length ? 'completed' : 'pending';
 
           collapsedForks.set(summaryId, { stepName: step.step_name, forkPrefix, forkIds });
+          for (const [groupId, groupSteps] of groups) {
+            if (!forkIds.some(forkId => groupId === forkId || groupId.startsWith(forkId + '-'))) continue;
+            for (const forkStep of groupSteps) followNodeByStepId.set(forkStep.id, summaryId);
+          }
 
           nodes.push({
             id: summaryId,
@@ -767,7 +821,7 @@ function buildGraph(
     });
   }
 
-  return { nodes: [...groupNodes, ...nodes], edges, stepMap, collapsedForks };
+  return { nodes: [...groupNodes, ...nodes], edges, stepMap, collapsedForks, followNodeByStepId };
 }
 
 // ─── Color mode hook ───────────────────────────────────────────────
@@ -794,7 +848,11 @@ interface Props {
 }
 
 export default function WorkflowGraph({ steps, onStepClick }: Props) {
-  const { nodes, edges, stepMap, collapsedForks } = useMemo(() => buildGraph(steps), [steps]);
+  const { nodes, edges, stepMap, collapsedForks, followNodeByStepId } = useMemo(() => buildGraph(steps), [steps]);
+  const followTargetId = useMemo(
+    () => resolveFollowTarget(steps, followNodeByStepId),
+    [steps, followNodeByStepId],
+  );
   const colorMode = useColorMode();
   const [fullscreen, setFullscreen] = useState(false);
   const [activeFork, setActiveFork] = useState<CollapsedForkMeta | null>(null);
@@ -875,6 +933,7 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
             pannable
             zoomable
           />
+          <FollowRunningButton nodes={nodes} targetId={followTargetId} />
           <JumpToBottomButton nodes={nodes} />
         </ReactFlow>
       </div>

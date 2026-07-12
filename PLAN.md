@@ -11,6 +11,7 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Markovd CLI plan](docs/plans/003-markovd-cli.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
 - [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
+- [Run graph follow-mode decision](docs/decisions/ADR-0003-follow-running-workflow-step.md)
 
 ## Milestones
 
@@ -26,6 +27,7 @@ None.
 
 ## Done Tasks
 
+- [Implement continuous follow mode for the run graph](docs/tasks/done/run-graph-follow-running-step.md)
 - [Add Trigger Run workflow entrypoint override](docs/tasks/done/trigger-run-workflow-entrypoint.md)
 - [Collapse Trigger Run volume selectors](docs/tasks/done/trigger-run-advanced-volumes.md)
 - [Define workflow definition model](docs/tasks/done/workflow-definition-model.md)
@@ -39,6 +41,7 @@ None.
 
 ## Open Bugs
 
+- [Frontend lint baseline fails](docs/bugs/open/frontend-lint-baseline-fails.md)
 - [Verify or implement `/api/v1/health`](docs/bugs/open/health-endpoint-unverified.md)
 - [Use Kubernetes runner in k8s deployment](docs/bugs/open/runner-bug-1.md)
 - [Markov job does not send callbacks](docs/bugs/open/runner-bug-3-callbacks-silent.md)

@@ -370,3 +370,44 @@ Verified:
 - `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache go test ./cmd/markovd-cli`
 - `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache go test ./...`
 - `env GOCACHE=/tmp/go-build-cache GOMODCACHE=/tmp/go-mod-cache make markovd-cli`
+
+## 2026-07-12
+
+Agent: codex
+
+Planned:
+- Added ADR-0003 defining an opt-in React Flow mode that follows the most
+  recently updated running step while preserving zoom.
+- Defined deterministic behavior for concurrent running steps, unchanged poll
+  results, periods with no running step, and collapsed fork summaries.
+- Added a pending implementation task and linked both artifacts from
+  `PLAN.md`.
+
+Verified:
+- Reviewed the existing run polling, graph construction, React Flow viewport
+  control, collapsed fork, and jump-to-bottom implementations.
+- `git diff --check`
+
+## 2026-07-12
+
+Agent: codex
+
+Completed:
+- Implemented the run-graph follow mode from ADR-0003.
+- Added deterministic latest-running-step selection, collapsed fork summary
+  mapping, zoom-preserving viewport movement, unchanged-target suppression, and
+  an accessible pressed-state control.
+- Added Node-native unit coverage and a frontend `npm test` command.
+- Recorded the pre-existing repository-wide frontend lint failures in
+  `docs/bugs/open/frontend-lint-baseline-fails.md`.
+- Accepted ADR-0003 and moved the implementation task to `done`.
+
+Verified:
+- `cd ui && npm test`
+- `cd ui && npm run build`
+- `cd ui && npx eslint src/components/WorkflowGraph.tsx src/components/workflowGraphFollow.ts src/components/workflowGraphFollow.test.ts`
+- `git diff --check`
+- Playwright fixture checks in normal and fullscreen layouts confirmed pressed
+  state, non-overlapping controls, preserved zoom, movement to a newer running
+  target, collapsed-summary focus, no movement for unchanged targets, and no
+  movement while follow mode was disabled.
