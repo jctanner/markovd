@@ -7,6 +7,7 @@ import {
   MiniMap,
   Handle,
   Position,
+  MarkerType,
   useReactFlow,
 } from '@xyflow/react';
 import type { Node, Edge, NodeProps } from '@xyflow/react';
@@ -88,6 +89,9 @@ type StructureNodeData = {
   subWorkflow?: string;
   when?: string;
   workflowGroup: string;
+  invocationPath?: string;
+  callerStep?: string;
+  referenceKind?: string;
 };
 
 function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
@@ -129,16 +133,35 @@ function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
   );
 }
 
+function StructureReferenceNode({ data }: NodeProps<Node<StructureNodeData>>) {
+  const recursive = data.referenceKind === 'recursive';
+  return (
+    <div className={`graph-node struct-reference-node struct-reference-${recursive ? 'recursive' : 'empty'}`}>
+      <Handle type="target" position={Position.Top} className="graph-handle" />
+      <div className="graph-node-top">
+        <span className="graph-node-icon" title={recursive ? 'recursive reference' : 'empty workflow'}>
+          {iconSvg(recursive ? 'loop' : 'circle')}
+        </span>
+        <span className="graph-node-name">{data.label}</span>
+      </div>
+      <div className="struct-reference-kind">{recursive ? 'RECURSION STOP' : 'PASS THROUGH'}</div>
+      <Handle type="source" position={Position.Bottom} className="graph-handle" />
+    </div>
+  );
+}
+
 type GroupNodeData = {
   label: string;
   workflowGroup: string;
   category: string;
+  callerStep?: string;
 };
 
 function WorkflowGroupNode({ data }: NodeProps<Node<GroupNodeData>>) {
   return (
     <div className="struct-group-node">
       <div className="struct-group-label">{data.label}</div>
+      {data.callerStep && <div className="struct-group-caller">via {data.callerStep}</div>}
     </div>
   );
 }
@@ -183,7 +206,14 @@ function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
 
 const nodeTypes = {
   workflowStep: StructureStepNode,
+  workflowReference: StructureReferenceNode,
   group: WorkflowGroupNode,
+};
+
+const edgeColor = {
+  sequence: 'var(--border-hover)',
+  call: 'var(--status-skipped)',
+  return: 'var(--status-completed)',
 };
 
 interface Props {
@@ -211,13 +241,19 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
     target: e.target,
     type: e.type || 'smoothstep',
     animated: e.animated || false,
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+    zIndex: e.relation === 'sequence' || !e.relation ? 1 : 2,
     style: e.style ? {
-      stroke: 'var(--border-hover)',
+      stroke: edgeColor[e.relation || 'sequence'],
       strokeWidth: 2,
+      ...(e.relation === 'call' ? { strokeDasharray: '6 3' } : {}),
+      ...(e.relation === 'return' ? { strokeDasharray: '3 3' } : {}),
       ...e.style,
     } : {
-      stroke: 'var(--border-hover)',
+      stroke: edgeColor[e.relation || 'sequence'],
       strokeWidth: 2,
+      ...(e.relation === 'call' ? { strokeDasharray: '6 3' } : {}),
+      ...(e.relation === 'return' ? { strokeDasharray: '3 3' } : {}),
     },
   }));
 

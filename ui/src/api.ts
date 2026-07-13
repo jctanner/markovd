@@ -161,6 +161,9 @@ export interface DiagramNodeData {
   when?: string;
   rules?: string[];
   workflowGroup: string;
+  invocationPath?: string;
+  callerStep?: string;
+  referenceKind?: string;
 }
 
 export interface DiagramNode {
@@ -179,6 +182,7 @@ export interface DiagramEdge {
   target: string;
   type: string;
   animated: boolean;
+  relation?: 'sequence' | 'call' | 'return';
   style?: Record<string, string | number>;
 }
 

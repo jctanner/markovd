@@ -1876,6 +1876,42 @@ td.cell-link a:hover {
   padding: 10px 14px;
 }
 
+.struct-group-caller {
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.struct-reference-node {
+  cursor: default;
+  height: 46px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-left-width: 3px;
+  border-left-style: dashed;
+}
+
+.struct-reference-recursive {
+  border-left-color: var(--status-skipped);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.struct-reference-empty {
+  border-left-color: var(--text-muted);
+  background: var(--bg-surface);
+}
+
+.struct-reference-kind {
+  margin-top: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
 [data-theme="light"] .struct-group-node {
   background: rgba(124, 58, 237, 0.04);
   border-color: rgba(124, 58, 237, 0.2);

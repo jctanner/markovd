@@ -458,3 +458,57 @@ Verified:
 - Playwright verified a mixed project response renders exactly the classified
   file and directory candidates with correct imported state and no horizontal
   overflow.
+
+## 2026-07-12
+
+Agent: codex
+
+Planned:
+- Added ADR-0005 to render a separate workflow invocation group per
+  sub-workflow call site in definition diagrams.
+- Defined semantic `sequence`, `call`, and `return` edges so child completion is
+  an explicit prerequisite for the caller's next step.
+- Defined effective invocation exits for nested and final-step calls, static
+  all-branches joins for `for_each`, and bounded recursive-reference expansion.
+- Added plan 005 covering invocation-tree generation, topology, layout,
+  frontend rendering, backend tests, and Playwright comparison with
+  `var/demos/end-to-end` runs.
+- Linked the ADR and plan from `PLAN.md`.
+
+Verified:
+- Inspected the current workflow diagram generator and React Flow structure
+  renderer.
+- Compared the `var/demos/end-to-end` definition diagram with completed run
+  `markov-run-cc8a1a27`, including repeated `run-skill` invocations and runtime
+  `for_each` cardinality.
+- `git diff --check`
+
+## 2026-07-12
+
+Agent: codex
+
+Completed:
+- Implemented ADR-0005 and plan 005 for call-site-expanded workflow definition
+  diagrams.
+- Added invocation-path groups, bottom-up entry/exit topology, semantic
+  sequence/call/return edges, synthetic empty and recursive nodes, and bounded
+  expansion.
+- Updated React Flow to distinguish call and return direction and identify
+  repeated groups by caller step.
+- Added exact topology coverage for repeated, nested, final, `for_each`, empty,
+  recursive, unresolved, duplicate-ID, limit, file, and directory cases.
+- Recorded the independently discovered mobile navigation overflow in
+  `docs/bugs/open/mobile-navigation-horizontal-overflow.md`.
+- Accepted ADR-0005, marked plan 005 implemented, and moved the task to `done`.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `env GOCACHE=/tmp/go-build-cache go vet ./internal/api`
+- `cd ui && npm test`
+- `cd ui && npm run build`
+- `cd ui && npx eslint src/api.ts src/components/WorkflowStructureGraph.tsx`
+- `git diff --check`
+- Playwright rendered the current `var/demos/end-to-end` definition as 99 nodes,
+  74 semantic edges, 24 non-overlapping groups, and 8 separate `run-skill`
+  groups. Normal, fullscreen, zoomed, mobile, and synthetic-recursion checks
+  were nonblank and had no graph-local overlap or clipping.

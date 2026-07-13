@@ -10,10 +10,12 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Run graph workflow boundaries plan](docs/plans/002-run-graph-workflow-boundaries.md)
 - [Markovd CLI plan](docs/plans/003-markovd-cli.md)
 - [Standalone Markov workflow classification plan](docs/plans/004-standalone-workflow-classification.md)
+- [Call-site-expanded workflow diagram plan](docs/plans/005-call-site-expanded-workflow-diagrams.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
 - [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
 - [Run graph follow-mode decision](docs/decisions/ADR-0003-follow-running-workflow-step.md)
 - [Standalone Markov workflow classification decision](docs/decisions/ADR-0004-classify-standalone-markov-workflows.md)
+- [Call-site-expanded workflow diagram decision](docs/decisions/ADR-0005-expand-definition-diagrams-by-call-site.md)
 
 ## Milestones
 
@@ -29,6 +31,7 @@ None.
 
 ## Done Tasks
 
+- [Expand workflow diagrams by call site](docs/tasks/done/call-site-expanded-workflow-diagrams.md)
 - [Classify standalone project workflow YAML](docs/tasks/done/standalone-workflow-classification.md)
 - [Implement continuous follow mode for the run graph](docs/tasks/done/run-graph-follow-running-step.md)
 - [Add Trigger Run workflow entrypoint override](docs/tasks/done/trigger-run-workflow-entrypoint.md)
@@ -44,6 +47,7 @@ None.
 
 ## Open Bugs
 
+- [Mobile navigation causes horizontal page overflow](docs/bugs/open/mobile-navigation-horizontal-overflow.md)
 - [Frontend lint baseline fails](docs/bugs/open/frontend-lint-baseline-fails.md)
 - [Verify or implement `/api/v1/health`](docs/bugs/open/health-endpoint-unverified.md)
 - [Use Kubernetes runner in k8s deployment](docs/bugs/open/runner-bug-1.md)
