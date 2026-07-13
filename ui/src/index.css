@@ -1811,6 +1811,144 @@ td.cell-link a:hover {
   cursor: default;
 }
 
+.graph-handle-semantic {
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 1px !important;
+  min-height: 1px !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.graph-container .react-flow__node,
+.graph-container .react-flow__edge-path {
+  transition: opacity var(--ease-fast), filter var(--ease-fast), stroke-width var(--ease-fast);
+}
+
+.graph-container .react-flow__node.struct-path-muted {
+  opacity: 0.22;
+}
+
+.graph-container .react-flow__node.struct-path-active {
+  opacity: 1;
+}
+
+.graph-container .react-flow__node.struct-path-active.selected .graph-node,
+.graph-container .react-flow__node.struct-path-active.selected .struct-group-node {
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--accent);
+}
+
+.graph-container .react-flow__edge.struct-edge-active .react-flow__edge-path,
+.graph-container .react-flow__edge.selected .react-flow__edge-path {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+.struct-graph-key {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  width: max-content;
+  max-width: calc(100% - 104px);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.struct-graph-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.struct-graph-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.struct-graph-line {
+  width: 22px;
+  height: 0;
+  border-top: 2px solid var(--border-hover);
+}
+
+.struct-graph-line-call {
+  border-top-color: var(--status-skipped);
+  border-top-style: dashed;
+}
+
+.struct-graph-line-return {
+  border-top-color: var(--status-completed);
+  border-top-style: dotted;
+}
+
+.struct-graph-selection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.struct-graph-selection-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 300px;
+}
+
+.struct-graph-selection-copy strong {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.struct-graph-selection-copy span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.struct-graph-clear {
+  display: inline-flex;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.struct-graph-clear:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.struct-graph-clear:focus-visible,
+.graph-fullscreen-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .struct-node-type {
   font-size: 10px;
   font-family: var(--font-mono);

@@ -513,6 +513,51 @@ Verified:
   groups. Normal, fullscreen, zoomed, mobile, and synthetic-recursion checks
   were nonblank and had no graph-local overlap or clipping.
 
+## 2026-07-13
+
+Agent: codex
+
+Planned:
+- Added a pending task to improve semantic edge readability in workflow
+  definition diagrams through a legend, relation details, path emphasis, and
+  clearer call/return routing.
+- Captured open design questions around persistent labels, collapsible
+  invocation groups, and backend-versus-frontend lane assignment.
+
+Verified:
+- Playwright confirmed wheel zoom and pointer-drag panning work in the deployed
+  `var/demos/end-to-end` React Flow diagram.
+- The 99-node, 74-edge fit view rendered at approximately 0.096 zoom; at a
+  readable zoom, long connections entered from outside the viewport without
+  enough origin context, and no visible legend explained edge relation colors.
+
+## 2026-07-13
+
+Agent: codex
+
+Completed:
+- Improved workflow definition edge readability with a persistent semantic
+  legend, accessible relation and endpoint details, and invocation-scoped path
+  emphasis.
+- Routed calls through right-to-left outbound handles and returns through
+  separate left-to-right inbound handles while keeping sequence flow vertical.
+- Added pointer and keyboard selection, explicit clearing, stronger focused
+  arrows, unrelated-path dimming, and backend/frontend rolling-upgrade support.
+- Added backend semantic-handle coverage and frontend invocation-focus tests.
+- Moved the edge-readability task to `done`.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `env GOCACHE=/tmp/go-build-cache go vet ./internal/api`
+- `cd ui && npm test`
+- `cd ui && npm run build`
+- `cd ui && npx eslint src/api.ts src/components/WorkflowStructureGraph.tsx src/components/workflowStructureFocus.ts src/components/workflowStructureFocus.test.ts`
+- `git diff --check`
+- Playwright verified the 99-node, 74-edge `var/demos/end-to-end` diagram at
+  fit and working zoom, pointer and keyboard path selection, relation details,
+  clearing, pan, zoom, jump, fit, minimap, fullscreen, light/dark themes, and a
+  `390x844` mobile viewport without graph-local overlap.
+
 ## 2026-10-05 — Ansible step type icons
 
 Markov gained `ansible` and `ansible_playbook` primitives. markovd's backend is step-type agnostic, so the only UI change was the graph icon maps in `WorkflowGraph.tsx` and `WorkflowStructureGraph.tsx` (`ansible` uses the terminal icon, `ansible_playbook` a new book icon). `tsc -b` and `npm test` pass.

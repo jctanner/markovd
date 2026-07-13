@@ -59,13 +59,15 @@ type DiagramNode struct {
 }
 
 type DiagramEdge struct {
-	ID       string                 `json:"id"`
-	Source   string                 `json:"source"`
-	Target   string                 `json:"target"`
-	Type     string                 `json:"type"`
-	Animated bool                   `json:"animated"`
-	Style    map[string]interface{} `json:"style,omitempty"`
-	Relation string                 `json:"relation,omitempty"`
+	ID           string                 `json:"id"`
+	Source       string                 `json:"source"`
+	Target       string                 `json:"target"`
+	SourceHandle string                 `json:"sourceHandle,omitempty"`
+	TargetHandle string                 `json:"targetHandle,omitempty"`
+	Type         string                 `json:"type"`
+	Animated     bool                   `json:"animated"`
+	Style        map[string]interface{} `json:"style,omitempty"`
+	Relation     string                 `json:"relation,omitempty"`
 }
 
 type DiagramResponse struct {
@@ -411,11 +413,23 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 }
 
 func appendDiagramEdge(edges *[]DiagramEdge, relation, source, target string) {
+	sourceHandle := "sequence-source"
+	targetHandle := "sequence-target"
+	switch relation {
+	case "call":
+		sourceHandle = "call-source"
+		targetHandle = "call-target"
+	case "return":
+		sourceHandle = "return-source"
+		targetHandle = "return-target"
+	}
 	*edges = append(*edges, DiagramEdge{
-		ID:       fmt.Sprintf("edge:%s:%s->%s", relation, source, target),
-		Source:   source,
-		Target:   target,
-		Type:     "smoothstep",
-		Relation: relation,
+		ID:           fmt.Sprintf("edge:%s:%s->%s", relation, source, target),
+		Source:       source,
+		Target:       target,
+		SourceHandle: sourceHandle,
+		TargetHandle: targetHandle,
+		Type:         "smoothstep",
+		Relation:     relation,
 	})
 }

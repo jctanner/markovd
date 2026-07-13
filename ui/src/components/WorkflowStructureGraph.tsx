@@ -1,4 +1,5 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,6 +14,10 @@ import {
 import type { Node, Edge, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { DiagramNode, DiagramEdge } from '../api';
+import {
+  resolveStructureFocus,
+  type StructureSelection,
+} from './workflowStructureFocus';
 
 const categoryBorder: Record<string, string> = {
   gate: '#d97706',
@@ -83,6 +88,8 @@ function iconSvg(name: string) {
       return <svg {...props}><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>;
     case 'help':
       return <svg {...props}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+    case 'x':
+      return <svg {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
     default:
       return <svg {...props}><circle cx="12" cy="12" r="4" /></svg>;
   }
@@ -101,6 +108,19 @@ type StructureNodeData = {
   referenceKind?: string;
 };
 
+function SemanticHandles() {
+  return (
+    <>
+      <Handle id="sequence-target" type="target" position={Position.Top} className="graph-handle" />
+      <Handle id="sequence-source" type="source" position={Position.Bottom} className="graph-handle" />
+      <Handle id="call-source" type="source" position={Position.Right} className="graph-handle-semantic" />
+      <Handle id="return-target" type="target" position={Position.Right} className="graph-handle-semantic" />
+      <Handle id="call-target" type="target" position={Position.Left} className="graph-handle-semantic" />
+      <Handle id="return-source" type="source" position={Position.Left} className="graph-handle-semantic" />
+    </>
+  );
+}
+
 function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
   const border = categoryBorder[data.category] || categoryBorder.normal;
   const icon = data.category === 'foreach' ? 'loop'
@@ -115,7 +135,7 @@ function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
       className={`graph-node struct-node struct-node-${data.category}`}
       style={{ borderLeftColor: border }}
     >
-      <Handle type="target" position={Position.Top} className="graph-handle" />
+      <SemanticHandles />
       <div className="graph-node-top">
         <span className="graph-node-icon" title={data.stepType || 'step'}>
           {iconSvg(icon)}
@@ -135,7 +155,6 @@ function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
       {data.subWorkflow && (
         <div className="struct-node-sub">{data.subWorkflow}</div>
       )}
-      <Handle type="source" position={Position.Bottom} className="graph-handle" />
     </div>
   );
 }
@@ -144,7 +163,7 @@ function StructureReferenceNode({ data }: NodeProps<Node<StructureNodeData>>) {
   const recursive = data.referenceKind === 'recursive';
   return (
     <div className={`graph-node struct-reference-node struct-reference-${recursive ? 'recursive' : 'empty'}`}>
-      <Handle type="target" position={Position.Top} className="graph-handle" />
+      <SemanticHandles />
       <div className="graph-node-top">
         <span className="graph-node-icon" title={recursive ? 'recursive reference' : 'empty workflow'}>
           {iconSvg(recursive ? 'loop' : 'circle')}
@@ -152,7 +171,6 @@ function StructureReferenceNode({ data }: NodeProps<Node<StructureNodeData>>) {
         <span className="graph-node-name">{data.label}</span>
       </div>
       <div className="struct-reference-kind">{recursive ? 'RECURSION STOP' : 'PASS THROUGH'}</div>
-      <Handle type="source" position={Position.Bottom} className="graph-handle" />
     </div>
   );
 }
@@ -223,6 +241,12 @@ const edgeColor = {
   return: 'var(--status-completed)',
 };
 
+const relationLabel = {
+  sequence: 'Sequence',
+  call: 'Call',
+  return: 'Return',
+};
+
 interface Props {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
@@ -231,38 +255,77 @@ interface Props {
 export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdges }: Props) {
   const colorMode = useColorMode();
   const [fullscreen, setFullscreen] = useState(false);
+  const [selection, setSelection] = useState<StructureSelection | null>(null);
 
-  const nodes: Node[] = rawNodes.map((n) => ({
-    id: n.id,
-    type: n.type,
-    position: n.position,
-    data: n.data,
-    parentId: n.parentId,
-    extent: n.extent as 'parent' | undefined,
-    style: n.style,
-  }));
+  const focus = useMemo(
+    () => resolveStructureFocus(rawNodes, rawEdges, selection),
+    [rawNodes, rawEdges, selection],
+  );
 
-  const edges: Edge[] = rawEdges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: e.type || 'smoothstep',
-    animated: e.animated || false,
-    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-    zIndex: e.relation === 'sequence' || !e.relation ? 1 : 2,
-    style: e.style ? {
-      stroke: edgeColor[e.relation || 'sequence'],
-      strokeWidth: 2,
-      ...(e.relation === 'call' ? { strokeDasharray: '6 3' } : {}),
-      ...(e.relation === 'return' ? { strokeDasharray: '3 3' } : {}),
-      ...e.style,
-    } : {
-      stroke: edgeColor[e.relation || 'sequence'],
-      strokeWidth: 2,
-      ...(e.relation === 'call' ? { strokeDasharray: '6 3' } : {}),
-      ...(e.relation === 'return' ? { strokeDasharray: '3 3' } : {}),
-    },
-  }));
+  const nodeLabelByID = useMemo(
+    () => new Map(rawNodes.map((node) => [node.id, node.data.label])),
+    [rawNodes],
+  );
+
+  const nodes: Node[] = useMemo(() => rawNodes.map((n) => {
+    const inFocus = focus?.nodeIDs.has(n.id) === true;
+    return {
+      id: n.id,
+      type: n.type,
+      position: n.position,
+      data: n.data,
+      parentId: n.parentId,
+      extent: n.extent as 'parent' | undefined,
+      style: n.style,
+      selected: selection?.kind === 'node' && selection.id === n.id,
+      selectable: true,
+      focusable: true,
+      ariaLabel: `${n.data.category === 'group' ? 'Workflow' : 'Step'} ${n.data.label}`,
+      className: focus ? (inFocus ? 'struct-path-active' : 'struct-path-muted') : '',
+    };
+  }), [rawNodes, focus, selection]);
+
+  const edges: Edge[] = useMemo(() => rawEdges.map((e) => {
+    const relation = e.relation || 'sequence';
+    const inFocus = focus?.edgeIDs.has(e.id) === true;
+    const selected = selection?.kind === 'edge' && selection.id === e.id;
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle || `${relation}-source`,
+      targetHandle: e.targetHandle || `${relation}-target`,
+      type: e.type || 'smoothstep',
+      animated: e.animated || false,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: selected || inFocus ? 20 : 16,
+        height: selected || inFocus ? 20 : 16,
+        color: edgeColor[relation],
+      },
+      zIndex: relation === 'sequence' ? 1 : 2,
+      selected,
+      selectable: true,
+      focusable: true,
+      ariaLabel: `${relationLabel[relation]} from ${nodeLabelByID.get(e.source) || e.source} to ${nodeLabelByID.get(e.target) || e.target}`,
+      className: focus ? (inFocus ? 'struct-edge-active' : 'struct-edge-muted') : `struct-edge-${relation}`,
+      style: {
+        stroke: edgeColor[relation],
+        strokeWidth: selected || inFocus ? 3.5 : 2,
+        ...(relation === 'call' ? { strokeDasharray: '8 4' } : {}),
+        ...(relation === 'return' ? { strokeDasharray: '3 4' } : {}),
+        ...e.style,
+        opacity: focus && !inFocus ? 0.12 : 1,
+      },
+    };
+  }), [rawEdges, focus, selection, nodeLabelByID]);
+
+  const selectedEdge = selection?.kind === 'edge'
+    ? rawEdges.find((edge) => edge.id === selection.id)
+    : undefined;
+  const selectedNode = selection?.kind === 'node'
+    ? rawNodes.find((node) => node.id === selection.id)
+    : undefined;
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y), 0);
   const graphHeight = Math.max(400, maxY + 150);
@@ -279,6 +342,39 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
     return () => window.removeEventListener('keydown', handler);
   }, [fullscreen]);
 
+  const onSelectionChange = useCallback(({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Node[]; edges: Edge[] }) => {
+    if (selectedEdges[0]) {
+      setSelection({ kind: 'edge', id: selectedEdges[0].id });
+    } else if (selectedNodes[0]) {
+      setSelection({ kind: 'node', id: selectedNodes[0].id });
+    }
+  }, []);
+
+  const onNodeClick = useCallback((_event: unknown, node: Node) => {
+    setSelection({ kind: 'node', id: node.id });
+  }, []);
+
+  const onEdgeClick = useCallback((_event: unknown, edge: Edge) => {
+    setSelection({ kind: 'edge', id: edge.id });
+  }, []);
+
+  const onGraphKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as Element;
+    const nodeElement = target.closest<HTMLElement>('.react-flow__node[data-id]');
+    if (nodeElement?.dataset.id) {
+      event.preventDefault();
+      setSelection({ kind: 'node', id: nodeElement.dataset.id });
+      return;
+    }
+    const edgeElement = target.closest<SVGElement>('.react-flow__edge[data-testid]');
+    const edgeTestID = edgeElement?.getAttribute('data-testid');
+    if (edgeTestID?.startsWith('rf__edge-')) {
+      event.preventDefault();
+      setSelection({ kind: 'edge', id: edgeTestID.slice('rf__edge-'.length) });
+    }
+  }, []);
+
   if (nodes.length === 0) {
     return <div className="graph-empty">No workflow structure to display.</div>;
   }
@@ -287,6 +383,7 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
     <div
       className={`graph-container${fullscreen ? ' graph-fullscreen' : ''}`}
       style={fullscreen ? undefined : { height: Math.min(graphHeight, 800) }}
+      onKeyDown={onGraphKeyDown}
     >
       <button
         className="graph-fullscreen-btn"
@@ -295,6 +392,42 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
       >
         {iconSvg(fullscreen ? 'shrink' : 'expand')}
       </button>
+      <aside className="struct-graph-key" aria-label="Workflow connection legend">
+        <div className="struct-graph-legend">
+          {(Object.keys(relationLabel) as Array<keyof typeof relationLabel>).map((relation) => (
+            <span className="struct-graph-legend-item" key={relation}>
+              <span className={`struct-graph-line struct-graph-line-${relation}`} aria-hidden="true" />
+              {relationLabel[relation]}
+            </span>
+          ))}
+        </div>
+        {(selectedEdge || selectedNode) && (
+          <div className="struct-graph-selection" role="status" aria-live="polite">
+            <div className="struct-graph-selection-copy">
+              {selectedEdge ? (
+                <>
+                  <strong>{relationLabel[selectedEdge.relation || 'sequence']}</strong>
+                  <span>{nodeLabelByID.get(selectedEdge.source) || selectedEdge.source} → {nodeLabelByID.get(selectedEdge.target) || selectedEdge.target}</span>
+                </>
+              ) : (
+                <>
+                  <strong>{selectedNode!.data.label}</strong>
+                  <span>{focus?.invocationPath || selectedNode!.data.workflowGroup}</span>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              className="struct-graph-clear"
+              onClick={() => setSelection(null)}
+              title="Clear path selection"
+              aria-label="Clear path selection"
+            >
+              {iconSvg('x')}
+            </button>
+          </div>
+        )}
+      </aside>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -304,7 +437,11 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
         fitViewOptions={{ padding: 0.3 }}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable
+        onSelectionChange={onSelectionChange}
+        onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
+        onPaneClick={() => setSelection(null)}
         panOnDrag
         zoomOnScroll
         minZoom={0.05}

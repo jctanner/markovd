@@ -31,6 +31,7 @@ None.
 
 ## Done Tasks
 
+- [Improve workflow definition edge readability](tasks/done/improve-workflow-definition-edge-readability.md)
 - [Expand workflow diagrams by call site](tasks/done/call-site-expanded-workflow-diagrams.md)
 - [Classify standalone project workflow YAML](tasks/done/standalone-workflow-classification.md)
 - [Implement continuous follow mode for the run graph](tasks/done/run-graph-follow-running-step.md)

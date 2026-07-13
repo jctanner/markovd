@@ -63,6 +63,38 @@ workflows:
 	assertEdge(t, diagram, "return", "empty:main/child@child", "step:main/done")
 }
 
+func TestGenerateDiagramAssignsSemanticEdgeHandles(t *testing.T) {
+	diagram, err := generateDiagram(diagramWorkflowFile{
+		Entrypoint: "main",
+		Workflows: []diagramWorkflow{
+			{Name: "main", Steps: []diagramStep{
+				{Name: "before", Type: "shell_exec"},
+				{Name: "child", Workflow: "child"},
+				{Name: "after", Type: "shell_exec"},
+			}},
+			{Name: "child", Steps: []diagramStep{{Name: "work", Type: "shell_exec"}}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generateDiagram() error: %v", err)
+	}
+
+	want := map[string][2]string{
+		"sequence": {"sequence-source", "sequence-target"},
+		"call":     {"call-source", "call-target"},
+		"return":   {"return-source", "return-target"},
+	}
+	for _, edge := range diagram.Edges {
+		handles, ok := want[edge.Relation]
+		if !ok {
+			t.Fatalf("unexpected relation %q", edge.Relation)
+		}
+		if edge.SourceHandle != handles[0] || edge.TargetHandle != handles[1] {
+			t.Errorf("%s handles = (%q, %q), want (%q, %q)", edge.Relation, edge.SourceHandle, edge.TargetHandle, handles[0], handles[1])
+		}
+	}
+}
+
 func TestGenerateDiagramExpandsRepeatedWorkflowByCallSite(t *testing.T) {
 	diagram, err := generateDiagram(diagramWorkflowFile{
 		Entrypoint: "main",

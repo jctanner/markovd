@@ -188,6 +188,8 @@ export interface DiagramEdge {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   type: string;
   animated: boolean;
   relation?: 'sequence' | 'call' | 'return';
