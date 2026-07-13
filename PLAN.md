@@ -9,9 +9,11 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Workflow input formats plan](docs/plans/001-workflow-input-formats.md)
 - [Run graph workflow boundaries plan](docs/plans/002-run-graph-workflow-boundaries.md)
 - [Markovd CLI plan](docs/plans/003-markovd-cli.md)
+- [Standalone Markov workflow classification plan](docs/plans/004-standalone-workflow-classification.md)
 - [Agent work ledger decision](docs/decisions/ADR-0001-agent-work-ledger.md)
 - [Workflow definition input formats decision](docs/decisions/ADR-0002-workflow-definition-input-formats.md)
 - [Run graph follow-mode decision](docs/decisions/ADR-0003-follow-running-workflow-step.md)
+- [Standalone Markov workflow classification decision](docs/decisions/ADR-0004-classify-standalone-markov-workflows.md)
 
 ## Milestones
 
@@ -27,6 +29,7 @@ None.
 
 ## Done Tasks
 
+- [Classify standalone project workflow YAML](docs/tasks/done/standalone-workflow-classification.md)
 - [Implement continuous follow mode for the run graph](docs/tasks/done/run-graph-follow-running-step.md)
 - [Add Trigger Run workflow entrypoint override](docs/tasks/done/trigger-run-workflow-entrypoint.md)
 - [Collapse Trigger Run volume selectors](docs/tasks/done/trigger-run-advanced-volumes.md)

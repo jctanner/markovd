@@ -188,7 +188,7 @@ func (s *Server) handleListProjectFiles(w http.ResponseWriter, r *http.Request) 
 
 	definitions, err := projects.ListWorkflowDefinitions(clonePath)
 	if err != nil {
-		writeJSON(w, http.StatusOK, []interface{}{})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 

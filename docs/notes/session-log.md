@@ -411,3 +411,50 @@ Verified:
   state, non-overlapping controls, preserved zoom, movement to a newer running
   target, collapsed-summary focus, no movement for unchanged targets, and no
   movement while follow mode was disabled.
+
+## 2026-07-12
+
+Agent: codex
+
+Planned:
+- Added ADR-0004 defining structural classification for standalone Markov YAML
+  discovered during project sync.
+- Required an explicit entrypoint, a non-empty workflows sequence, a named
+  workflow with a steps sequence, and an entrypoint-to-workflow-name match.
+- Kept directory detection ahead of file classification and retained Markov as
+  the authoritative import-time validator.
+- Added the standalone workflow classification implementation plan and linked
+  both artifacts from `PLAN.md`.
+
+Verified:
+- Reviewed project filesystem discovery, project file API responses, Projects
+  page rendering, import-time validation, current single-file workflow samples,
+  and existing directory workflow regression coverage.
+- `git diff --check`
+
+## 2026-07-12
+
+Agent: codex
+
+Completed:
+- Implemented ADR-0004 and plan 004 for standalone Markov workflow
+  classification during project discovery.
+- Added a pure YAML-node classifier with stable reasons for valid, malformed,
+  ambiguous, and structurally non-matching documents.
+- Filtered standalone project definitions while preserving directory roots,
+  descendant exclusion, deterministic ordering, and import-time Markov
+  validation.
+- Changed genuine project discovery failures from an empty success response to
+  an HTTP 500 error with the discovery error.
+- Accepted ADR-0004, marked plan 004 implemented, and moved the implementation
+  task to `done`.
+
+Verified:
+- `env GOCACHE=/tmp/go-build-cache go test ./internal/projects ./internal/api`
+- `env GOCACHE=/tmp/go-build-cache go test ./...`
+- `env GOCACHE=/tmp/go-build-cache go vet ./internal/projects ./internal/api`
+- `cd ui && npm run build`
+- `git diff --check`
+- Playwright verified a mixed project response renders exactly the classified
+  file and directory candidates with correct imported state and no horizontal
+  overflow.

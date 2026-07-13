@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -129,12 +130,22 @@ func ListWorkflowDefinitions(repoPath string) ([]WorkflowDefinitionEntry, error)
 		if insideWorkflowDirectory(file, dirs) {
 			continue
 		}
+		content, err := os.ReadFile(filepath.Join(repoPath, filepath.FromSlash(file)))
+		if err != nil {
+			return nil, fmt.Errorf("reading workflow candidate %s: %w", file, err)
+		}
+		if !classifyStandaloneWorkflowYAML(content).IsWorkflow {
+			continue
+		}
 		entries = append(entries, WorkflowDefinitionEntry{
 			Path: file,
 			Kind: workflowdef.KindFile,
 			Name: DeriveWorkflowName(file),
 		})
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Path < entries[j].Path
+	})
 	return entries, nil
 }
 
