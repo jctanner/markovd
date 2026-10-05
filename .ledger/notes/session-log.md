@@ -512,3 +512,7 @@ Verified:
   74 semantic edges, 24 non-overlapping groups, and 8 separate `run-skill`
   groups. Normal, fullscreen, zoomed, mobile, and synthetic-recursion checks
   were nonblank and had no graph-local overlap or clipping.
+
+## 2026-10-05 — Ansible step type icons
+
+Markov gained `ansible` and `ansible_playbook` primitives. markovd's backend is step-type agnostic, so the only UI change was the graph icon maps in `WorkflowGraph.tsx` and `WorkflowStructureGraph.tsx` (`ansible` uses the terminal icon, `ansible_playbook` a new book icon). `tsc -b` and `npm test` pass.

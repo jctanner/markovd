@@ -31,6 +31,8 @@ const categoryLabel: Record<string, string> = {
 
 const typeIcons: Record<string, string> = {
   shell_exec: 'terminal',
+  ansible: 'terminal',
+  ansible_playbook: 'book',
   llm_invoke: 'brain',
   http_request: 'globe',
   gate: 'lock',
@@ -48,6 +50,8 @@ function iconSvg(name: string) {
   switch (name) {
     case 'terminal':
       return <svg {...props}><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>;
+    case 'book':
+      return <svg {...props}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>;
     case 'brain':
       return <svg {...props}><circle cx="12" cy="12" r="3" /><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z" /><line x1="10" y1="22" x2="14" y2="22" /></svg>;
     case 'globe':
