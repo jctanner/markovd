@@ -103,6 +103,14 @@ export interface Step {
   updated_at: string | null;
 }
 
+export interface StepProgressEvent {
+  id: number;
+  run_id: string;
+  kind: string;
+  data: Record<string, unknown>;
+  received_at: string;
+}
+
 export interface RunDetail extends Run {
   steps: Step[];
 }
@@ -228,6 +236,18 @@ export const api = {
   getJobLogs(jobName: string) {
     return request<{ logs: string; job_name: string; cached?: string; error?: string }>(
       `/jobs/${encodeURIComponent(jobName)}/logs`
+    );
+  },
+
+  getStepProgress(step: Step, after = 0) {
+    const qs = new URLSearchParams({
+      step: step.step_name,
+      workflow: step.workflow_name,
+      after: String(after),
+    });
+    if (step.fork_id) qs.set('fork', step.fork_id);
+    return request<{ events: StepProgressEvent[] }>(
+      `/runs/${encodeURIComponent(step.run_id)}/progress?${qs.toString()}`
     );
   },
 

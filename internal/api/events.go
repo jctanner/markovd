@@ -117,6 +117,10 @@ func (s *Server) processEvent(r *http.Request, runID, eventType string, payload 
 	case "run_failed":
 		_ = s.db.UpsertRunFromEvent(ctx, root, getString("workflow_name"), "failed", nil, ts)
 
+	case "step_progress":
+		// Live in-step progress (for example claude transcript events). It is
+		// kept only in the events table and read through the progress endpoint.
+
 	case "sub_run_started", "sub_run_completed", "sub_run_failed":
 		// stored in events table only; no separate runs row needed
 

@@ -139,6 +139,7 @@ func (d *DB) migrate() error {
 				ALTER TABLE runs ADD COLUMN secret_volumes_json TEXT DEFAULT '[]';
 			END IF;
 		END $$`,
+		`CREATE INDEX IF NOT EXISTS idx_events_run_id ON events(run_id, id)`,
 		`DO $$ BEGIN
 			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='steps' AND column_name='updated_at') THEN
 				ALTER TABLE steps ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();

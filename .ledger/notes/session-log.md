@@ -516,3 +516,7 @@ Verified:
 ## 2026-10-05 — Ansible step type icons
 
 Markov gained `ansible` and `ansible_playbook` primitives. markovd's backend is step-type agnostic, so the only UI change was the graph icon maps in `WorkflowGraph.tsx` and `WorkflowStructureGraph.tsx` (`ansible` uses the terminal icon, `ansible_playbook` a new book icon). `tsc -b` and `npm test` pass.
+
+## 2026-10-05 — claude step_progress in markovd
+
+Added a progress endpoint, a Transcript section in the step modal, a `claude` graph icon, and fork-event cleanup on run delete. Verified end to end with real markov and `claude`. Recorded a pre-existing bug: a run stays `running` if markov exits before sending events. See [task](../tasks/done/claude-step-progress-ui.md) and [bug](../bugs/open/shell-runner-failure-leaves-run-running.md).

@@ -47,3 +47,34 @@ func TestForkID(t *testing.T) {
 		}
 	}
 }
+
+func TestEventRunID(t *testing.T) {
+	for _, tt := range []struct{ root, fork, want string }{
+		{"97639fd9", "", ""},
+		{"97639fd9", "deploy_all-0", "97639fd9-deploy_all-0"},
+		{"markov-run-a3ab59e4", "step1", "markov-run-a3ab59e4-step1"},
+	} {
+		if got := eventRunID(tt.root, tt.fork); got != tt.want {
+			t.Errorf("eventRunID(%q, %q) = %q, want %q", tt.root, tt.fork, got, tt.want)
+		}
+	}
+	// A fork's events must resolve back to the same root and fork.
+	id := eventRunID("markov-run-a3ab59e4", "step1")
+	if rootRunID(id) != "markov-run-a3ab59e4" || forkID(id) != "step1" {
+		t.Errorf("round trip failed for %q", id)
+	}
+}
+
+func TestParseNonNegative(t *testing.T) {
+	if n, err := parseNonNegative("", 7); err != nil || n != 7 {
+		t.Errorf("default = %d, %v", n, err)
+	}
+	if n, err := parseNonNegative("12", 0); err != nil || n != 12 {
+		t.Errorf("12 = %d, %v", n, err)
+	}
+	for _, bad := range []string{"-1", "x", "1.5"} {
+		if _, err := parseNonNegative(bad, 0); err == nil {
+			t.Errorf("%q should be rejected", bad)
+		}
+	}
+}

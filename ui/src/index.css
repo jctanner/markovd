@@ -2604,3 +2604,77 @@ td.cell-link a:hover {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+.transcript-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.transcript {
+  max-height: 50vh;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--bg-root);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transcript-item {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.transcript-text {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.transcript-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.transcript-tool {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.transcript-tool-name {
+  color: var(--status-running);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.transcript-tool-input {
+  color: var(--text-secondary);
+}
+
+.transcript-result {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-left: 2px solid var(--border);
+}
+
+.transcript-result-error {
+  color: var(--status-failed);
+  border-left-color: var(--status-failed);
+}
+
+.transcript-limit {
+  color: var(--status-failed);
+  font-weight: 600;
+}

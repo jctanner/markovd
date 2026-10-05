@@ -44,6 +44,7 @@ None.
 - [Support diagrams for directory workflow definitions](tasks/done/workflow-definition-diagrams.md)
 - [Verify workflow definition formats end to end](tasks/done/workflow-definition-e2e-verification.md)
 - [Add Markovd API CLI](tasks/done/markovd-cli.md)
+- [Show claude step icon and live step_progress](tasks/done/claude-step-progress-ui.md)
 
 ## Open Bugs
 
@@ -54,6 +55,7 @@ None.
 - [Markov job does not send callbacks](bugs/open/runner-bug-3-callbacks-silent.md)
 - [PVC artifact loader cannot read after job completion](bugs/open/runner-bug-6-artifact-loader-pvc.md)
 - [RunDetail UI memory growth on large runs](bugs/open/ui-memory-leak-large-runs.md)
+- [Run stays running when markov exits before emitting events](bugs/open/shell-runner-failure-leaves-run-running.md)
 
 ## Fixed Bugs
 

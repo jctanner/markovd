@@ -82,7 +82,7 @@ func (d *DB) DeleteRun(ctx context.Context, runID string) error {
 
 	for _, q := range []string{
 		`DELETE FROM steps WHERE run_id = $1`,
-		`DELETE FROM events WHERE run_id = $1`,
+		`DELETE FROM events WHERE run_id = $1 OR left(run_id, length($1) + 1) = $1 || '-'`,
 		`DELETE FROM runs WHERE run_id = $1`,
 	} {
 		if _, err := tx.ExecContext(ctx, q, runID); err != nil {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
-import type { Step } from '../api';
+import type { Step, StepProgressEvent } from '../api';
+import { describeToolInput, isTerminalKind, mergeProgress, summarizeProgress } from './stepProgress.ts';
 
 interface Props {
   step: Step | null;
@@ -161,6 +162,137 @@ function LogsSection({ step, jobName }: { step: Step; jobName: string }) {
   );
 }
 
+const PROGRESS_POLL_MS = 2000;
+const PROGRESS_PAGE = 500;
+const settledStatuses = new Set(['completed', 'failed', 'skipped']);
+
+function TranscriptItem({ event }: { event: StepProgressEvent }) {
+  const d = event.data;
+  switch (event.kind) {
+    case 'init':
+      return (
+        <div className="transcript-item transcript-meta">
+          Session started{d.model ? ` · ${String(d.model)}` : ''}{d.session_id ? ` · ${String(d.session_id)}` : ''}
+        </div>
+      );
+    case 'text':
+      return <div className="transcript-item transcript-text">{String(d.text ?? '')}</div>;
+    case 'tool_use':
+      return (
+        <div className="transcript-item transcript-tool">
+          <span className="transcript-tool-name">{String(d.name ?? 'tool')}</span>
+          <span className="transcript-tool-input">{describeToolInput(d.input)}</span>
+        </div>
+      );
+    case 'tool_result':
+      return (
+        <pre className={`transcript-item transcript-result${d.is_error ? ' transcript-result-error' : ''}`}>
+          {String(d.content ?? '') || '(no output)'}
+        </pre>
+      );
+    case 'limit_exceeded':
+      return (
+        <div className="transcript-item transcript-limit">
+          Limit exceeded: {String(d.limit)} (max {String(d.max)}{d.observed !== undefined ? `, reached ${String(d.observed)}` : ''})
+        </div>
+      );
+    case 'result':
+      return (
+        <div className="transcript-item transcript-meta">
+          Finished{d.is_error ? ' with an error' : ''}{d.stop_reason ? ` · ${String(d.stop_reason)}` : ''}
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+// Live in-step progress (for example a claude transcript). Renders nothing
+// when the step emitted no progress events. Callers key it by step identity so
+// switching steps remounts it with fresh state.
+function TranscriptSection({ step }: { step: Step }) {
+  const [events, setEvents] = useState<StepProgressEvent[]>([]);
+  const [error, setError] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastId = 0;
+    let seen: StepProgressEvent[] = [];
+
+    const tick = async () => {
+      let more = false;
+      let failed = false;
+      try {
+        const res = await api.getStepProgress(step, lastId);
+        if (cancelled) return;
+        const incoming = res.events ?? [];
+        if (incoming.length > 0) {
+          lastId = incoming[incoming.length - 1].id;
+          seen = mergeProgress(seen, incoming);
+          setEvents(seen);
+        }
+        more = incoming.length >= PROGRESS_PAGE;
+        setError(false);
+      } catch {
+        if (cancelled) return;
+        failed = true;
+        setError(true);
+      }
+      // The step prop is a snapshot, so a step that was running when opened is
+      // followed until its stream reports a terminal event.
+      const terminal = seen.some((e) => isTerminalKind(e.kind));
+      const settled = settledStatuses.has(step.status);
+      if (more) {
+        timer = setTimeout(tick, 0);
+      } else if (!terminal && !(settled && !failed)) {
+        timer = setTimeout(tick, PROGRESS_POLL_MS);
+      }
+    };
+    tick();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.run_id, step.fork_id, step.workflow_name, step.step_name]);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [events]);
+
+  if (events.length === 0) return error ? <div className="modal-loading">Failed to load progress</div> : null;
+
+  const summary = summarizeProgress(events);
+  return (
+    <div className="step-detail-section">
+      <div className="step-detail-section-header">
+        <span className="step-detail-section-label">Transcript</span>
+        {!summary.finished && step.status === 'running' && <span className="modal-live-badge">Live</span>}
+        <span className="transcript-summary">
+          {summary.turns} turn{summary.turns === 1 ? '' : 's'} · {summary.tokens.toLocaleString()} tokens
+          {summary.costUSD !== null ? ` · $${summary.costUSD.toFixed(2)}` : ''}
+        </span>
+        {summary.limitExceeded && <span className="badge badge-failed">{summary.limitExceeded}</span>}
+      </div>
+      <div
+        className="transcript"
+        ref={bodyRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+        }}
+      >
+        {events.map((e) => <TranscriptItem key={e.id} event={e} />)}
+      </div>
+    </div>
+  );
+}
+
 export default function StepDetailModal({ step, onClose }: Props) {
   if (!step) return null;
 
@@ -225,6 +357,11 @@ export default function StepDetailModal({ step, onClose }: Props) {
             </div>
           )}
 
+          <TranscriptSection
+            key={`${step.run_id}/${step.fork_id}/${step.workflow_name}/${step.step_name}`}
+            step={step}
+          />
+
           {outputEntries.length > 0 && (
             <div className="step-detail-section">
               <div className="step-detail-section-label">Output</div>
@@ -233,7 +370,11 @@ export default function StepDetailModal({ step, onClose }: Props) {
                   <div key={k} className="step-detail-output-row">
                     <span className="step-detail-output-key">{k}</span>
                     <span className="step-detail-output-val">
-                      {typeof v === 'string' ? v : JSON.stringify(v)}
+                      {typeof v === 'string'
+                        ? v
+                        : k === 'events' && Array.isArray(v)
+                          ? `${v.length} events (see Transcript)`
+                          : JSON.stringify(v)}
                     </span>
                   </div>
                 ))}
