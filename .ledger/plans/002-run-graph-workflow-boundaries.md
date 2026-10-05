@@ -191,7 +191,7 @@ Verified on 2026-07-08 against the local dev UI at
 - `markov-run-a25ff450` verified that a graph step with top-level
   `output_json.job_name` still opens a details modal with a Logs section.
 - Screenshot evidence:
-  `docs/plans/run-graph-workflow-boundaries.png`
+  `.ledger/plans/run-graph-workflow-boundaries.png`
 - Browser verification reported 0 console errors.
 - `npm run build` passed in `ui/`.
 - `npx eslint src/components/WorkflowGraph.tsx` passed in `ui/`.

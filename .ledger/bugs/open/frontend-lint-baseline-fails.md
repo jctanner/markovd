@@ -40,4 +40,4 @@ Observed on 2026-07-12 with ESLint 10.2.1:
 
 ## Related Tasks
 
-- `docs/tasks/done/run-graph-follow-running-step.md`
+- `.ledger/tasks/done/run-graph-follow-running-step.md`

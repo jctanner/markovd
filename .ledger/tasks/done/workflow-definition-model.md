@@ -37,7 +37,7 @@ Done
 
 ## Notes
 
-Plan reference: `docs/plans/001-workflow-input-formats.md`.
+Plan reference: `.ledger/plans/001-workflow-input-formats.md`.
 
 Implementation started:
 - Added workflow definition model fields to `internal/models/models.go`.

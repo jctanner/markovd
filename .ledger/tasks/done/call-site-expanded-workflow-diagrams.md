@@ -85,6 +85,6 @@ Verification performed on 2026-07-12:
 - Normal and fullscreen views were nonblank and correctly framed. Zoomed views
   showed readable call and return direction. At `390x844`, the 342px graph had
   no local overflow or control overlap. The separate global navigation overflow
-  is recorded in `docs/bugs/open/mobile-navigation-horizontal-overflow.md`.
+  is recorded in `.ledger/bugs/open/mobile-navigation-horizontal-overflow.md`.
 - A synthetic recursion fixture rendered its reference node, caller subtitle,
   and nonzero purple call/green return paths.

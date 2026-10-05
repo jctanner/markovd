@@ -31,7 +31,7 @@ binary from the sibling Markov checkout before the stack is built or started.
 - `bin/markov`
 - `Makefile`
 - `podman-compose.yml`
-- `docs/plans/001-workflow-input-formats.md`
+- `.ledger/plans/001-workflow-input-formats.md`
 - UI and API files touched by the implementation tasks
 
 ## Status

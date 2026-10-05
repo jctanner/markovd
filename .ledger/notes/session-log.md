@@ -6,13 +6,13 @@ Agent: codex
 
 Completed:
 - Adopted the agent work ledger layout for repository docs.
-- Moved the project overview to `docs/plans/000-overview.md`.
-- Moved operational notes to `docs/notes/`.
-- Moved open and fixed bugs into `docs/bugs/open/` and `docs/bugs/fixed/`.
+- Moved the project overview to `.ledger/plans/000-overview.md`.
+- Moved operational notes to `.ledger/notes/`.
+- Moved open and fixed bugs into `.ledger/bugs/open/` and `.ledger/bugs/fixed/`.
 - Added `PLAN.md` and `AGENTS.md` as root navigation and agent instruction files.
 
 Next:
-- Convert future work into task files under `docs/tasks/pending/`.
+- Convert future work into task files under `.ledger/tasks/pending/`.
 
 ## 2026-07-02
 
@@ -35,7 +35,7 @@ Discovered:
 
 Next:
 - Start with the workflow definition model task. This task later moved to
-  `docs/tasks/done/workflow-definition-model.md`.
+  `.ledger/tasks/done/workflow-definition-model.md`.
 
 ## 2026-07-02
 
@@ -166,7 +166,7 @@ Completed:
   lanes instead of being flattened into the parent workflow chain.
 - Preserved existing branch expansion and summary behavior for `for_each`
   forks while treating exact child `fork_id` groups as sub-workflows.
-- Moved the graph flattening bug record to `docs/bugs/fixed/` with Playwright
+- Moved the graph flattening bug record to `.ledger/bugs/fixed/` with Playwright
   coordinate evidence and a screenshot artifact.
 
 Verified:
@@ -186,7 +186,7 @@ Completed:
   steps, derived from exact `fork_id` workflow scopes.
 - Styled workflow boundaries with quiet dashed containers and compact labels.
 - Recorded screenshot evidence in
-  `docs/plans/run-graph-workflow-boundaries.png`.
+  `.ledger/plans/run-graph-workflow-boundaries.png`.
 
 Verified:
 - Playwright against `http://127.0.0.1:5173/runs/markov-run-b09c12f9`
@@ -225,7 +225,7 @@ Completed:
 - Stopped rendering workflow boundary containers around expanded `for_each`
   branch paths while preserving boundaries around actual workflow calls.
 - Added clearer workflow boundary label separation and more header padding.
-- Moved the bug record to `docs/bugs/fixed/` with Playwright screenshot
+- Moved the bug record to `.ledger/bugs/fixed/` with Playwright screenshot
   evidence.
 
 Verified:
@@ -244,10 +244,10 @@ Verified:
 Agent: codex
 
 Completed:
-- Added `docs/plans/003-markovd-cli.md`, a plan for `./bin/markovd-cli` with
+- Added `.ledger/plans/003-markovd-cli.md`, a plan for `./bin/markovd-cli` with
   full API CRUD coverage and primary flows for project sync/wait and workflow
   trigger/wait.
-- Added `docs/tasks/pending/markovd-cli.md` so the implementation has a ledger
+- Added `.ledger/tasks/pending/markovd-cli.md` so the implementation has a ledger
   task.
 - Linked the plan and pending task from `PLAN.md`.
 - Tightened the CLI plan and task requirements for easy username/password
@@ -283,7 +283,7 @@ Completed:
 - Added strict PVC and Secret mount parsing for `NAME:/absolute/path`.
 - Added `.markovd-cli-config.toml` to `.gitignore` to reduce accidental
   credential commits.
-- Moved the CLI task to `docs/tasks/done/markovd-cli.md`.
+- Moved the CLI task to `.ledger/tasks/done/markovd-cli.md`.
 
 Verified:
 - `env GOCACHE=/tmp/go-build-cache go test ./cmd/markovd-cli`
@@ -399,7 +399,7 @@ Completed:
   an accessible pressed-state control.
 - Added Node-native unit coverage and a frontend `npm test` command.
 - Recorded the pre-existing repository-wide frontend lint failures in
-  `docs/bugs/open/frontend-lint-baseline-fails.md`.
+  `.ledger/bugs/open/frontend-lint-baseline-fails.md`.
 - Accepted ADR-0003 and moved the implementation task to `done`.
 
 Verified:
@@ -498,7 +498,7 @@ Completed:
 - Added exact topology coverage for repeated, nested, final, `for_each`, empty,
   recursive, unresolved, duplicate-ID, limit, file, and directory cases.
 - Recorded the independently discovered mobile navigation overflow in
-  `docs/bugs/open/mobile-navigation-horizontal-overflow.md`.
+  `.ledger/bugs/open/mobile-navigation-horizontal-overflow.md`.
 - Accepted ADR-0005, marked plan 005 implemented, and moved the task to `done`.
 
 Verified:

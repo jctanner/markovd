@@ -79,10 +79,10 @@ expanded, and long workflow paths should truncate or be summarized cleanly.
 
 Resolution screenshots:
 
-- `docs/bugs/fixed/run-graph-boundary-labels-fixed-fitview.png`
-- `docs/bugs/fixed/run-graph-boundary-labels-fixed-fullscreen.png`
-- `docs/bugs/fixed/run-graph-boundary-labels-fixed-graph.png`
-- `docs/bugs/fixed/run-graph-boundary-labels-fixed-zoom.png`
+- `.ledger/bugs/fixed/run-graph-boundary-labels-fixed-fitview.png`
+- `.ledger/bugs/fixed/run-graph-boundary-labels-fixed-fullscreen.png`
+- `.ledger/bugs/fixed/run-graph-boundary-labels-fixed-graph.png`
+- `.ledger/bugs/fixed/run-graph-boundary-labels-fixed-zoom.png`
 
 ## Verification
 

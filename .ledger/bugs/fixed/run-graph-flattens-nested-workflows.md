@@ -70,7 +70,7 @@ under the parent step that invoked them.
    - node labels and statuses remain readable at desktop viewport sizes
 8. Run frontend build checks and any focused graph/unit tests available.
 9. Record screenshots, commands, and verification results in this bug file
-   before moving it to `docs/bugs/fixed/`.
+   before moving it to `.ledger/bugs/fixed/`.
 
 ## Impact
 
@@ -97,7 +97,7 @@ expanded or summarized according to the existing branch threshold.
 - Opened `http://127.0.0.1:5173/runs/markov-run-b09c12f9` with Playwright,
   selected the Graph tab, and accepted the large-run render confirmation.
 - Captured screenshot evidence:
-  `docs/bugs/fixed/run-graph-nested-workflows-fixed.png`
+  `.ledger/bugs/fixed/run-graph-nested-workflows-fixed.png`
 - Verified React Flow node transforms for the nested workflow:
   - top-level `main` steps render at `x=0`, including `run_pipeline`
   - `run_pipeline` child steps render at `x=340`, including `rfe_speedrun`,

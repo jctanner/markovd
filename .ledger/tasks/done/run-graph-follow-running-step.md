@@ -68,7 +68,7 @@ Verification performed on 2026-07-12:
 - `npm run build` passed TypeScript and the Vite production build.
 - `npx eslint src/components/WorkflowGraph.tsx src/components/workflowGraphFollow.ts src/components/workflowGraphFollow.test.ts`
   passed. Repository-wide `npm run lint` remains blocked by the pre-existing
-  failures recorded in `docs/bugs/open/frontend-lint-baseline-fails.md`.
+  failures recorded in `.ledger/bugs/open/frontend-lint-baseline-fails.md`.
 - `git diff --check` passed.
 - Playwright fixture verification confirmed that enabling follow changed the
   viewport transform while preserving zoom (`scale(1.13469)`), and a subsequent

@@ -52,7 +52,7 @@ Plan: [Markovd CLI Plan](../../plans/003-markovd-cli.md)
 
 - `cmd/markovd-cli/`
 - `internal/api/`
-- `docs/plans/003-markovd-cli.md`
+- `.ledger/plans/003-markovd-cli.md`
 
 ## Verification
 
