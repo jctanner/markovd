@@ -91,9 +91,13 @@ func (d *DB) UpsertStep(ctx context.Context, runID, forkID, workflowName, stepNa
 		   step_type = COALESCE(EXCLUDED.step_type, steps.step_type),
 		   status = EXCLUDED.status,
 		   output_json = COALESCE(EXCLUDED.output_json, steps.output_json),
-		   error = COALESCE(EXCLUDED.error, steps.error),
+		   -- A step that runs again (a resumed run) or completes drops the error of an
+		   -- earlier attempt; other updates keep it unless they bring their own.
+		   error = CASE WHEN EXCLUDED.status IN ('running', 'completed') THEN EXCLUDED.error
+		                ELSE COALESCE(EXCLUDED.error, steps.error) END,
 		   started_at = COALESCE(EXCLUDED.started_at, steps.started_at),
-		   completed_at = COALESCE(EXCLUDED.completed_at, steps.completed_at),
+		   completed_at = CASE WHEN EXCLUDED.status = 'running' THEN NULL
+		                       ELSE COALESCE(EXCLUDED.completed_at, steps.completed_at) END,
 		   updated_at = now()`,
 		runID, forkID, workflowName, stepName, stepType, status, nullIfEmpty(outputJSON), nullIfEmpty(stepError), startedAt, completedAt,
 	)

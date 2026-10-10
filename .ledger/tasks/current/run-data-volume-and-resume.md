@@ -38,6 +38,9 @@ Gaps found while running Breadboard's strat-workflow benchmark from markovd:
   paused run stayed "running"), and `run_resumed` sets it to `running`.
 - **Cancel and delete:** Cancel deletes every Job labelled with the run ID
   (the first run and any resumes). Delete also removes the run's directory.
+- **Step errors on re-run:** a step that runs again or completes now drops
+  the error from an earlier attempt. Before, a resumed step showed
+  "completed" next to its first attempt's error.
 - **Projects:** `MARKOVD_PROJECTS_DIR=/data/projects` on the same volume, so
   clones survive restarts.
 - **UI:**
