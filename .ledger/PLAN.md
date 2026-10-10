@@ -23,6 +23,7 @@ bugs, decisions, and operational notes live under `docs/`.
 
 ## Active Tasks
 
+None.
 
 ## Pending Tasks
 
