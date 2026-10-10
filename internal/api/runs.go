@@ -118,6 +118,8 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Vars = withSourceCommit(req.Vars, wf.SourceCommit)
+
 	claims := getClaims(r)
 	varsJSON, _ := json.Marshal(req.Vars)
 	volumesJSON, _ := json.Marshal(req.Volumes)
@@ -481,4 +483,22 @@ func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// withSourceCommit passes the commit a git-imported workflow came from to the
+// run as the workflow_source_commit var, so the workflow can pin anything it
+// fetches to the same commit. A value the caller set is kept.
+func withSourceCommit(vars map[string]string, commit string) map[string]string {
+	if commit == "" {
+		return vars
+	}
+	if _, set := vars["workflow_source_commit"]; set {
+		return vars
+	}
+	out := make(map[string]string, len(vars)+1)
+	for k, v := range vars {
+		out[k] = v
+	}
+	out["workflow_source_commit"] = commit
+	return out
 }

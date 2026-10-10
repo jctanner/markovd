@@ -33,6 +33,10 @@ planning Breadboard's strat-workflow benchmark
   the content no longer matches a commit.
 - `CreateRun` copies the workflow's `source_commit` into the run, so a later
   re-import does not change what an earlier run reports.
+- Starting a run passes the workflow's commit to it as the
+  `workflow_source_commit` var (unless the caller set that var), so a
+  workflow can pin what it fetches, such as job scripts cloned from the
+  same repository, to the commit it was imported from.
 - API JSON: `source_commit` on workflows, `workflow_source_commit` on runs.
 - UI: the workflow page shows the commit next to "Source"; the run page has a
   "Source commit" card when the run has one.
@@ -42,7 +46,7 @@ planning Breadboard's strat-workflow benchmark
 - `go build ./...`, `go vet ./internal/...`, `go test ./...`: pass.
 - New tests: `TestReadWorkflowDefinitionDirectoryKeepsNonYAMLFiles`
   (scripts, data and README kept; hidden directory skipped) and
-  `TestHeadCommit`.
+  `TestHeadCommit`, and `TestWithSourceCommit` for the run var.
 - `npx tsc --noEmit` in `ui/`: pass.
 - Deployed with Breadboard's `make host-rebuild-markovd` (2026-10-09): pod
   2/2 Running, startup log clean, `/api/v1/health` 200. Postgres has
