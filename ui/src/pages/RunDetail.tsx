@@ -49,7 +49,9 @@ function mergeSteps(existing: Step[], delta: Step[]): Step[] {
 
 type ViewMode = 'graph' | 'gantt' | 'table' | 'logs';
 
-const LARGE_RUN_THRESHOLD = 25;
+// Above this many steps the run opens on Logs and asks before drawing the graph. The graph
+// collapses fan-outs of more than five branches, so a few hundred steps draw fine.
+const LARGE_RUN_THRESHOLD = 500;
 
 export default function RunDetail() {
   const { runID } = useParams<{ runID: string }>();

@@ -38,3 +38,31 @@ See the addendum in ADR-0006. Tests:
 - `TestFullyDynamicTemplateWithoutNamesIsUnresolved`.
 
 They replace `TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded`.
+
+## Follow-up: the run graph's for_each branches overlapped
+
+The run graph (`WorkflowGraph.tsx`, laid out in the browser) had its own
+problems:
+
+- **Fixed spacing:** it placed a `for_each`'s branches `FORK_GAP_X` (280px)
+  apart around the parent, ignoring how wide each branch's own fan-out or
+  sub-workflow boxes were. With nested fan-outs (strat-workflow's rounds →
+  tests → variants), round 0's S2 column was drawn exactly on round 1's S1
+  column.
+- **Too close:** cards are 294px wide, so even plain neighbouring branches
+  overlapped by 14px.
+
+`runGraphLayout.ts` now measures each chain's left and right extent first
+(sub-workflow chains with their box padding, nested fan-outs, collapsed
+fan-outs adding nothing). It places sibling branches side by side by those
+widths, 40px apart, centred under the parent.
+
+Tests (`runGraphLayout.test.ts`):
+- the benchmark's shape has no shared columns;
+- a branch with its sub-workflow box fits between its neighbours;
+- branches are centred, and plain neighbours no longer overlap;
+- collapsed fan-outs add no width.
+
+`LARGE_RUN_THRESHOLD`, which opened runs on Logs and asked before drawing
+the graph, went from 25 steps to 500; a single benchmark run already has
+46.

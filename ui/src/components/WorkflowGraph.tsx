@@ -13,13 +13,15 @@ import {
 import type { Node, Edge, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Step } from '../api';
+import { childPath as chainChildPath, findForEachForks as forEachForks, measureExtents, placeForks } from './runGraphLayout';
 import { resolveFollowTarget } from './workflowGraphFollow';
 
 const NODE_H = 72;
 const NODE_W = 294;
 const SUMMARY_NODE_H = 96;
 const NODE_GAP_Y = 60;
-const FORK_GAP_X = 280;
+// Space between neighbouring for_each branches (runGraphLayout places them by measured width).
+const FORK_SIBLING_GAP = 40;
 const CHILD_GAP_X = 340;
 const START_Y = 40;
 const START_X = 0;
@@ -528,9 +530,15 @@ function buildGraph(
   const expandedForkBranchPaths = new Set<string>();
   const collapsedForks = new Map<string, CollapsedForkMeta>();
 
-  function childPath(path: string, stepName: string): string {
-    return path ? `${path}-${stepName}` : stepName;
-  }
+  const childPath = chainChildPath;
+  // Each chain's width, so for_each branches can be placed side by side without overlapping.
+  const extents = measureExtents(groups, {
+    nodeW: NODE_W,
+    childGapX: CHILD_GAP_X,
+    groupPadX: GROUP_PAD_X,
+    siblingGap: FORK_SIBLING_GAP,
+    collapseThreshold: COLLAPSE_THRESHOLD,
+  });
 
   function nodeIdFor(path: string, stepName: string): string {
     return `${path || 'main'}::${stepName}`;
@@ -560,15 +568,7 @@ function buildGraph(
   }
 
   function findForEachForks(forkPrefix: string): string[] {
-    const prefix = forkPrefix + '-';
-    const candidates: string[] = [];
-    for (const fid of groups.keys()) {
-      if (!fid.startsWith(prefix)) continue;
-      candidates.push(fid);
-    }
-    return candidates.filter(fid =>
-      !candidates.some(other => other !== fid && fid.startsWith(other + '-'))
-    );
+    return forEachForks(groups, forkPrefix);
   }
 
   function aggregateBranchStatuses(forkIds: string[]): { completed: number; running: number; failed: number; skipped: number; pending: number } {
@@ -725,13 +725,14 @@ function buildGraph(
             expandedForkBranchPaths.add(forkId);
           }
           const forkStartY = y;
-          const totalWidth = (forkIds.length - 1) * FORK_GAP_X;
-          const forkBaseX = x - totalWidth / 2;
+          const forkXs = placeForks(x, forkIds.map(f => extents.get(f) ?? { left: 0, right: NODE_W }), {
+            nodeW: NODE_W, childGapX: CHILD_GAP_X, groupPadX: GROUP_PAD_X, siblingGap: FORK_SIBLING_GAP, collapseThreshold: COLLAPSE_THRESHOLD,
+          });
           let maxForkEndY = y;
 
           for (let fi = 0; fi < forkIds.length; fi++) {
             const forkId = forkIds[fi];
-            const forkX = forkBaseX + fi * FORK_GAP_X;
+            const forkX = forkXs[fi];
 
             const { nodeIds: fNodeIds, endY: fEndY } = layoutChain(
               forkId, forkX, forkStartY,
