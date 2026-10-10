@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/jctanner/markovd/internal/workflowdef"
 )
 
@@ -189,6 +192,42 @@ func TestReadWorkflowDefinitionDirectoryWithStepTypesDirectory(t *testing.T) {
 	}
 }
 
+func TestReadWorkflowDefinitionDirectoryKeepsNonYAMLFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "bench/meta.yaml", "entrypoint: main\n")
+	writeFile(t, root, "bench/vars.yaml", "{}\n")
+	writeFile(t, root, "bench/rules.yaml", "[]\n")
+	writeFile(t, root, "bench/step_types.yaml", "{}\n")
+	writeFile(t, root, "bench/workflows/main.yaml", "name: main\nsteps: []\n")
+	writeFile(t, root, "bench/scripts/seed.py", "print('seed')\n")
+	writeFile(t, root, "bench/data/scenarios/f1.json", "{}\n")
+	writeFile(t, root, "bench/README.md", "# bench\n")
+	writeFile(t, root, "bench/.cache/skip.txt", "hidden\n")
+
+	def, err := ReadWorkflowDefinition(root, "bench", workflowdef.KindDirectory)
+	if err != nil {
+		t.Fatalf("ReadWorkflowDefinition() error: %v", err)
+	}
+	got := map[string]string{}
+	for _, f := range def.Files {
+		got[f.Path] = f.Content
+	}
+	for _, want := range []string{"scripts/seed.py", "data/scenarios/f1.json", "README.md"} {
+		if _, ok := got[want]; !ok {
+			t.Fatalf("file %q missing from definition: %v", want, got)
+		}
+	}
+	if got["scripts/seed.py"] != "print('seed')\n" {
+		t.Fatalf("scripts/seed.py content = %q", got["scripts/seed.py"])
+	}
+	if _, ok := got[".cache/skip.txt"]; ok {
+		t.Fatal("hidden directory file included in definition")
+	}
+	if len(def.Files) != 8 {
+		t.Fatalf("len(Files) = %d, want 8", len(def.Files))
+	}
+}
+
 func TestReadWorkflowDefinitionRejectsTraversal(t *testing.T) {
 	root := t.TempDir()
 	if _, err := ReadWorkflowDefinition(root, "../escape.yaml", workflowdef.KindFile); err == nil {
@@ -207,5 +246,37 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("WriteFile(%s): %v", rel, err)
+	}
+}
+
+func TestHeadCommit(t *testing.T) {
+	root := t.TempDir()
+	repo, err := git.PlainInit(root, false)
+	if err != nil {
+		t.Fatalf("PlainInit() error: %v", err)
+	}
+	writeFile(t, root, "README.md", "hello\n")
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Worktree() error: %v", err)
+	}
+	if _, err := wt.Add("README.md"); err != nil {
+		t.Fatalf("Add() error: %v", err)
+	}
+	want, err := wt.Commit("init", &git.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	})
+	if err != nil {
+		t.Fatalf("Commit() error: %v", err)
+	}
+	got, err := HeadCommit(root)
+	if err != nil {
+		t.Fatalf("HeadCommit() error: %v", err)
+	}
+	if got != want.String() {
+		t.Fatalf("HeadCommit() = %q, want %q", got, want.String())
+	}
+	if _, err := HeadCommit(t.TempDir()); err == nil {
+		t.Fatal("HeadCommit() expected error for a directory that is not a repository")
 	}
 }

@@ -13,17 +13,19 @@ func (d *DB) CreateRun(ctx context.Context, runID, workflowName string, workflow
 	var r models.Run
 	now := time.Now()
 	err := d.QueryRowContext(ctx,
-		`INSERT INTO runs (run_id, workflow_id, workflow_name, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at)
-		 VALUES ($1, $2, $3, 'running', $4, $5, $6, $7, $8)
+		`INSERT INTO runs (run_id, workflow_id, workflow_name, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, workflow_source_commit)
+		 VALUES ($1, $2, $3, 'running', $4, $5, $6, $7, $8,
+		         COALESCE((SELECT source_commit FROM workflows WHERE id = $2), ''))
 		 ON CONFLICT (run_id) DO UPDATE SET
 		   workflow_id = COALESCE(EXCLUDED.workflow_id, runs.workflow_id),
+		   workflow_source_commit = COALESCE(NULLIF(runs.workflow_source_commit, ''), EXCLUDED.workflow_source_commit),
 		   triggered_by = COALESCE(EXCLUDED.triggered_by, runs.triggered_by),
 		   vars_json = COALESCE(EXCLUDED.vars_json, runs.vars_json),
 		   volumes_json = COALESCE(EXCLUDED.volumes_json, runs.volumes_json),
 		   secret_volumes_json = COALESCE(EXCLUDED.secret_volumes_json, runs.secret_volumes_json)
-		 RETURNING id, run_id, workflow_id, workflow_name, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at`,
+		 RETURNING id, run_id, workflow_id, workflow_name, workflow_source_commit, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at`,
 		runID, workflowID, workflowName, triggeredBy, varsJSON, volumesJSON, secretVolumesJSON, now,
-	).Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt)
+	).Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.WorkflowSourceCommit, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating run: %w", err)
 	}
@@ -32,7 +34,7 @@ func (d *DB) CreateRun(ctx context.Context, runID, workflowName string, workflow
 
 func (d *DB) ListRuns(ctx context.Context) ([]models.Run, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, run_id, workflow_id, workflow_name, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at
+		`SELECT id, run_id, workflow_id, workflow_name, workflow_source_commit, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at
 		 FROM runs ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("listing runs: %w", err)
@@ -42,7 +44,7 @@ func (d *DB) ListRuns(ctx context.Context) ([]models.Run, error) {
 	var runs []models.Run
 	for rows.Next() {
 		var r models.Run
-		if err := rows.Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.WorkflowSourceCommit, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scanning run: %w", err)
 		}
 		runs = append(runs, r)
@@ -53,9 +55,9 @@ func (d *DB) ListRuns(ctx context.Context) ([]models.Run, error) {
 func (d *DB) GetRunByID(ctx context.Context, runID string) (*models.Run, error) {
 	var r models.Run
 	err := d.QueryRowContext(ctx,
-		`SELECT id, run_id, workflow_id, workflow_name, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at
+		`SELECT id, run_id, workflow_id, workflow_name, workflow_source_commit, status, triggered_by, vars_json, volumes_json, secret_volumes_json, started_at, completed_at, created_at
 		 FROM runs WHERE run_id = $1`, runID,
-	).Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt)
+	).Scan(&r.ID, &r.RunID, &r.WorkflowID, &r.WorkflowName, &r.WorkflowSourceCommit, &r.Status, &r.TriggeredBy, &r.VarsJSON, &r.VolumesJSON, &r.SecretVolumesJSON, &r.StartedAt, &r.CompletedAt, &r.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

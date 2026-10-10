@@ -35,12 +35,13 @@ func (d *DB) CreateWorkflowDefinition(ctx context.Context, name string, def mode
 		   definition_json = $4::jsonb,
 		   source_kind = 'manual',
 		   source_root = '',
+		   source_commit = '',
 		   project_id = NULL,
 		   source_path = '',
 		   updated_at = now()
-		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at`,
+		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at`,
 		name, yaml, def.Kind, defJSON, uploadedBy,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("creating workflow: %w", err)
 	}
@@ -49,7 +50,7 @@ func (d *DB) CreateWorkflowDefinition(ctx context.Context, name string, def mode
 
 func (d *DB) ListWorkflows(ctx context.Context) ([]models.Workflow, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at
+		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at
 		 FROM workflows ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("listing workflows: %w", err)
@@ -60,7 +61,7 @@ func (d *DB) ListWorkflows(ctx context.Context) ([]models.Workflow, error) {
 	for rows.Next() {
 		var w models.Workflow
 		var rawFiles string
-		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning workflow: %w", err)
 		}
 		hydrated, err := hydrateWorkflow(&w, rawFiles)
@@ -91,11 +92,11 @@ func (d *DB) UpdateWorkflowDefinition(ctx context.Context, name string, def mode
 	var rawFiles string
 	err = d.QueryRowContext(ctx,
 		`UPDATE workflows
-		 SET yaml = $2, definition_kind = $3, definition_json = $4::jsonb, updated_at = now()
+		 SET yaml = $2, definition_kind = $3, definition_json = $4::jsonb, source_commit = '', updated_at = now()
 		 WHERE name = $1
-		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at`,
+		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at`,
 		name, yaml, def.Kind, defJSON,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -121,9 +122,9 @@ func (d *DB) GetWorkflowByName(ctx context.Context, name string) (*models.Workfl
 	var w models.Workflow
 	var rawFiles string
 	err := d.QueryRowContext(ctx,
-		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at
+		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at
 		 FROM workflows WHERE name = $1`, name,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

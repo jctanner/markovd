@@ -147,6 +147,14 @@ func (d *DB) migrate() error {
 				CREATE INDEX idx_steps_run_updated ON steps(run_id, updated_at);
 			END IF;
 		END $$`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='workflows' AND column_name='source_commit') THEN
+				ALTER TABLE workflows ADD COLUMN source_commit TEXT NOT NULL DEFAULT '';
+			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='runs' AND column_name='workflow_source_commit') THEN
+				ALTER TABLE runs ADD COLUMN workflow_source_commit TEXT NOT NULL DEFAULT '';
+			END IF;
+		END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {

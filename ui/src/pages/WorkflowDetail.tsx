@@ -107,6 +107,9 @@ export default function WorkflowDetail() {
       {wf.source_path && (
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
           Source: {wf.source_path}
+          {wf.source_commit && (
+            <> · commit <span className="mono" title={wf.source_commit}>{wf.source_commit.slice(0, 12)}</span></>
+          )}
         </div>
       )}
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>

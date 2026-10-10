@@ -230,6 +230,14 @@ export default function RunDetail() {
           <div className="meta-label">Workflow</div>
           <div className="meta-value">{run.workflow_name}</div>
         </div>
+        {run.workflow_source_commit && (
+          <div className="meta-card">
+            <div className="meta-label">Source commit</div>
+            <div className="meta-value mono" title={run.workflow_source_commit}>
+              {run.workflow_source_commit.slice(0, 12)}
+            </div>
+          </div>
+        )}
         <div className="meta-card">
           <div className="meta-label">Status</div>
           <div className="meta-value">

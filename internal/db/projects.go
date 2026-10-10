@@ -95,10 +95,10 @@ func (d *DB) UpdateProjectSyncStatus(ctx context.Context, id int, status, syncEr
 
 func (d *DB) ImportProjectWorkflow(ctx context.Context, projectID int, name, yaml, sourcePath string, uploadedBy int) (*models.Workflow, error) {
 	def := workflowdef.FromLegacyYAML(yaml)
-	return d.ImportProjectWorkflowDefinition(ctx, projectID, name, def, sourcePath, sourcePath, uploadedBy)
+	return d.ImportProjectWorkflowDefinition(ctx, projectID, name, def, sourcePath, sourcePath, "", uploadedBy)
 }
 
-func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int, name string, def models.WorkflowDefinition, sourcePath, sourceRoot string, uploadedBy int) (*models.Workflow, error) {
+func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int, name string, def models.WorkflowDefinition, sourcePath, sourceRoot, sourceCommit string, uploadedBy int) (*models.Workflow, error) {
 	def, err := workflowdef.Normalize(def.Kind, def.Files)
 	if err != nil {
 		return nil, err
@@ -111,8 +111,8 @@ func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int,
 	var w models.Workflow
 	var rawFiles string
 	err = d.QueryRowContext(ctx,
-		`INSERT INTO workflows (name, yaml, definition_kind, definition_json, uploaded_by, project_id, source_path, source_kind, source_root)
-		 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'project', $8)
+		`INSERT INTO workflows (name, yaml, definition_kind, definition_json, uploaded_by, project_id, source_path, source_kind, source_root, source_commit)
+		 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'project', $8, $9)
 		 ON CONFLICT (name) DO UPDATE SET
 		   yaml = $2,
 		   definition_kind = $3,
@@ -121,10 +121,11 @@ func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int,
 		   source_path = $7,
 		   source_kind = 'project',
 		   source_root = $8,
+		   source_commit = $9,
 		   updated_at = now()
-		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at`,
-		name, yaml, def.Kind, defJSON, uploadedBy, projectID, sourcePath, sourceRoot,
-	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt)
+		 RETURNING id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at`,
+		name, yaml, def.Kind, defJSON, uploadedBy, projectID, sourcePath, sourceRoot, sourceCommit,
+	).Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("importing project workflow: %w", err)
 	}
@@ -133,7 +134,7 @@ func (d *DB) ImportProjectWorkflowDefinition(ctx context.Context, projectID int,
 
 func (d *DB) GetWorkflowsByProjectID(ctx context.Context, projectID int) ([]models.Workflow, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, created_at, updated_at
+		`SELECT id, name, yaml, definition_kind, definition_json::text, uploaded_by, project_id, source_path, source_kind, source_root, source_commit, created_at, updated_at
 		 FROM workflows WHERE project_id = $1 ORDER BY name`, projectID,
 	)
 	if err != nil {
@@ -145,7 +146,7 @@ func (d *DB) GetWorkflowsByProjectID(ctx context.Context, projectID int) ([]mode
 	for rows.Next() {
 		var w models.Workflow
 		var rawFiles string
-		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &w.YAML, &w.DefinitionKind, &rawFiles, &w.UploadedBy, &w.ProjectID, &w.SourcePath, &w.SourceKind, &w.SourceRoot, &w.SourceCommit, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning project workflow: %w", err)
 		}
 		hydrated, err := hydrateWorkflow(&w, rawFiles)

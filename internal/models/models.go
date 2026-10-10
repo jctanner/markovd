@@ -20,6 +20,7 @@ type Workflow struct {
 	SourcePath     string                   `json:"source_path,omitempty"`
 	SourceKind     string                   `json:"source_kind"`
 	SourceRoot     string                   `json:"source_root,omitempty"`
+	SourceCommit   string                   `json:"source_commit,omitempty"`
 	CreatedAt      time.Time                `json:"created_at"`
 	UpdatedAt      time.Time                `json:"updated_at"`
 }
@@ -53,18 +54,19 @@ type ProjectFile struct {
 }
 
 type Run struct {
-	ID                int        `json:"id"`
-	RunID             string     `json:"run_id"`
-	WorkflowID        *int       `json:"workflow_id,omitempty"`
-	WorkflowName      string     `json:"workflow_name"`
-	Status            string     `json:"status"`
-	TriggeredBy       *int       `json:"triggered_by,omitempty"`
-	VarsJSON          string     `json:"vars_json"`
-	VolumesJSON       string     `json:"volumes_json"`
-	SecretVolumesJSON string     `json:"secret_volumes_json"`
-	StartedAt         *time.Time `json:"started_at,omitempty"`
-	CompletedAt       *time.Time `json:"completed_at,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
+	ID                   int        `json:"id"`
+	RunID                string     `json:"run_id"`
+	WorkflowID           *int       `json:"workflow_id,omitempty"`
+	WorkflowName         string     `json:"workflow_name"`
+	WorkflowSourceCommit string     `json:"workflow_source_commit,omitempty"`
+	Status               string     `json:"status"`
+	TriggeredBy          *int       `json:"triggered_by,omitempty"`
+	VarsJSON             string     `json:"vars_json"`
+	VolumesJSON          string     `json:"volumes_json"`
+	SecretVolumesJSON    string     `json:"secret_volumes_json"`
+	StartedAt            *time.Time `json:"started_at,omitempty"`
+	CompletedAt          *time.Time `json:"completed_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
 }
 
 type Step struct {

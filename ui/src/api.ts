@@ -46,6 +46,7 @@ export interface Workflow {
   source_path?: string;
   source_kind: string;
   source_root?: string;
+  source_commit?: string;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +80,7 @@ export interface Run {
   id: number;
   run_id: string;
   workflow_name: string;
+  workflow_source_commit?: string;
   status: string;
   vars_json: string;
   volumes_json: string;

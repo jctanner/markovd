@@ -23,7 +23,7 @@ bugs, decisions, and operational notes live under `docs/`.
 
 ## Active Tasks
 
-None.
+- [Keep all files on project import and record the source commit](tasks/current/project-import-all-files-and-source-commit.md)
 
 ## Pending Tasks
 

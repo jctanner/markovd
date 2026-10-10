@@ -149,6 +149,10 @@ func (s *Server) handleSyncProject(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	_ = s.db.UpdateProjectSyncStatus(r.Context(), id, "synced", "", &now)
 
+	commit, err := projects.HeadCommit(clonePath)
+	if err != nil {
+		log.Printf("failed to read HEAD of project %d: %v", id, err)
+	}
 	linked, _ := s.db.GetWorkflowsByProjectID(r.Context(), id)
 	for _, wf := range linked {
 		if wf.SourcePath == "" {
@@ -159,7 +163,7 @@ func (s *Server) handleSyncProject(w http.ResponseWriter, r *http.Request) {
 			log.Printf("failed to re-sync workflow %s from project %d: %v", wf.Name, id, err)
 			continue
 		}
-		if _, err := s.db.ImportProjectWorkflowDefinition(r.Context(), id, wf.Name, def, wf.SourcePath, wf.SourceRoot, wf.UploadedBy); err != nil {
+		if _, err := s.db.ImportProjectWorkflowDefinition(r.Context(), id, wf.Name, def, wf.SourcePath, wf.SourceRoot, commit, wf.UploadedBy); err != nil {
 			log.Printf("failed to update workflow %s: %v", wf.Name, err)
 		}
 	}
@@ -246,6 +250,10 @@ func (s *Server) handleImportProjectFiles(w http.ResponseWriter, r *http.Request
 	}
 	var results []importResult
 
+	commit, err := projects.HeadCommit(clonePath)
+	if err != nil {
+		log.Printf("failed to read HEAD of project %d: %v", id, err)
+	}
 	for _, requested := range definitions {
 		if requested.Kind == "" {
 			requested.Kind = "file"
@@ -261,7 +269,7 @@ func (s *Server) handleImportProjectFiles(w http.ResponseWriter, r *http.Request
 		}
 
 		wfName := deriveWorkflowName(requested.Path)
-		_, err = s.db.ImportProjectWorkflowDefinition(r.Context(), id, wfName, def, requested.Path, requested.Path, claims.UserID)
+		_, err = s.db.ImportProjectWorkflowDefinition(r.Context(), id, wfName, def, requested.Path, requested.Path, commit, claims.UserID)
 		if err != nil {
 			results = append(results, importResult{Name: wfName, Path: requested.Path, Error: err.Error()})
 			continue

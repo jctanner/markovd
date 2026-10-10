@@ -47,6 +47,19 @@ func CloneOrPull(url, branch, destPath string) error {
 	return nil
 }
 
+// HeadCommit returns the commit hash checked out in a project clone.
+func HeadCommit(repoPath string) (string, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", fmt.Errorf("opening repository: %w", err)
+	}
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("reading HEAD: %w", err)
+	}
+	return head.Hash().String(), nil
+}
+
 func ListYAMLFiles(repoPath string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(repoPath, func(path string, d os.DirEntry, err error) error {
@@ -199,15 +212,17 @@ func ReadWorkflowDefinition(repoPath, rootPath, kind string) (models.WorkflowDef
 		}
 		root := filepath.Join(repoPath, cleaned)
 		var files []models.WorkflowDefinitionFile
+		// Keep every file under the root, as the CLI's directory upload does:
+		// scripts/ (script_exec), data files and docs travel with the
+		// workflow. Hidden directories such as .git are skipped.
 		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 			if d.IsDir() {
-				return nil
-			}
-			ext := strings.ToLower(filepath.Ext(path))
-			if ext != ".yaml" && ext != ".yml" {
+				if path != root && strings.HasPrefix(d.Name(), ".") {
+					return filepath.SkipDir
+				}
 				return nil
 			}
 			rel, err := filepath.Rel(root, path)
