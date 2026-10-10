@@ -363,3 +363,45 @@ func TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded(t *testing.T) {
 	}
 	t.Fatalf("submit step missing: %#v", diagram.Nodes)
 }
+
+func TestGenerateDiagramCarriesDescriptionsAndStepDetails(t *testing.T) {
+	diagram, err := generateDiagramFromDefinition(models.WorkflowDefinition{
+		Kind: workflowdef.KindDirectory,
+		Files: []models.WorkflowDefinitionFile{
+			{Path: "meta.yaml", Content: "entrypoint: main\n"},
+			{Path: "vars.yaml", Content: "{}\n"},
+			{Path: "rules.yaml", Content: "[]\n"},
+			{Path: "step_types.yaml", Content: "{}\n"},
+			{Path: "workflows/main.yaml", Content: `name: main
+description: The whole benchmark
+steps:
+  - name: each
+    description: One per item
+    for_each: items
+    for_each_when: "item.on"
+    as: item
+    type: shell_exec
+    ignore_errors: true
+    failed_when: "result.rc != 0"
+`},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generateDiagramFromDefinition() error: %v", err)
+	}
+	var group, step *DiagramNodeData
+	for i := range diagram.Nodes {
+		switch diagram.Nodes[i].Data.Label {
+		case "main":
+			group = &diagram.Nodes[i].Data
+		case "each":
+			step = &diagram.Nodes[i].Data
+		}
+	}
+	if group == nil || group.Description != "The whole benchmark" {
+		t.Fatalf("group = %#v", group)
+	}
+	if step == nil || step.Description != "One per item" || step.ForEachWhen != "item.on" || !step.IgnoreErrors || step.FailedWhen != "result.rc != 0" {
+		t.Fatalf("step = %#v", step)
+	}
+}

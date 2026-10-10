@@ -1906,7 +1906,7 @@ td.cell-link a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  max-width: 300px;
+  max-width: 360px;
 }
 
 .struct-graph-selection-copy strong {
@@ -2012,6 +2012,71 @@ td.cell-link a:hover {
   letter-spacing: 0.06em;
   color: #7c3aed;
   padding: 10px 14px;
+}
+
+.struct-group-description {
+  padding: 2px 14px 0;
+  font-size: 11px;
+  color: var(--text-secondary, var(--text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.struct-node-note {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.struct-details-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.struct-details-kind {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.struct-graph-selection-copy .struct-details-description {
+  margin: 6px 0 0;
+  max-height: 160px;
+  overflow-y: auto;
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.struct-details-fields {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+}
+
+.struct-details-fields div {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.struct-details-fields dt {
+  flex: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.struct-details-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
 }
 
 .struct-group-caller {

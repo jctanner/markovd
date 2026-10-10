@@ -88,6 +88,8 @@ function iconSvg(name: string) {
       return <svg {...props}><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>;
     case 'help':
       return <svg {...props}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+    case 'notes':
+      return <svg {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>;
     case 'x':
       return <svg {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
     default:
@@ -101,6 +103,10 @@ type StructureNodeData = {
   stepType: string;
   category: string;
   forEach?: string;
+  forEachWhen?: string;
+  ignoreErrors?: boolean;
+  failedWhen?: string;
+  rules?: string[];
   subWorkflow?: string;
   when?: string;
   workflowGroup: string;
@@ -143,6 +149,9 @@ function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
           {iconSvg(icon)}
         </span>
         <span className="graph-node-name">{data.label}</span>
+        {data.description && (
+          <span className="struct-node-note" aria-label="Has a description">{iconSvg('notes')}</span>
+        )}
       </div>
       <div className="graph-node-bottom">
         {data.stepType && (
@@ -179,6 +188,7 @@ function StructureReferenceNode({ data }: NodeProps<Node<StructureNodeData>>) {
 
 type GroupNodeData = {
   label: string;
+  description?: string;
   workflowGroup: string;
   category: string;
   callerStep?: string;
@@ -189,6 +199,9 @@ function WorkflowGroupNode({ data }: NodeProps<Node<GroupNodeData>>) {
     <div className="struct-group-node">
       <div className="struct-group-label">{data.label}</div>
       {data.callerStep && <div className="struct-group-caller">via {data.callerStep}</div>}
+      {data.description && (
+        <div className="struct-group-description" title={data.description}>{data.description}</div>
+      )}
     </div>
   );
 }
@@ -228,6 +241,42 @@ function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
     <button className="graph-jump-btn" onClick={jump} title="Jump to bottom">
       {iconSvg('arrow-down')}
     </button>
+  );
+}
+
+// The details panel for a selected step or workflow: its description in full and the settings
+// that decide when and how it runs. Cards stay compact; long-form text lives here.
+function NodeDetails({ data, path }: { data: DiagramNode['data']; path: string }) {
+  const isGroup = data.category === 'group';
+  const rows: Array<[string, string]> = [];
+  if (!isGroup) {
+    if (data.when) rows.push(['when', data.when]);
+    if (data.forEach) rows.push(['for_each', data.forEach]);
+    if (data.forEachWhen) rows.push(['for_each_when', data.forEachWhen]);
+    if (data.subWorkflow) rows.push(['workflow', data.subWorkflow]);
+    if (data.rules?.length) rows.push(['rules', data.rules.join(', ')]);
+    if (data.failedWhen) rows.push(['failed_when', data.failedWhen]);
+    if (data.ignoreErrors) rows.push(['ignore_errors', 'true']);
+  }
+  return (
+    <>
+      <div className="struct-details-head">
+        <strong>{data.label}</strong>
+        <span className="struct-details-kind">{isGroup ? 'workflow' : data.stepType || data.category}</span>
+      </div>
+      <span>{path}</span>
+      {data.description && <p className="struct-details-description">{data.description}</p>}
+      {rows.length > 0 && (
+        <dl className="struct-details-fields">
+          {rows.map(([key, value]) => (
+            <div key={key}>
+              <dt>{key}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
   );
 }
 
@@ -412,10 +461,7 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
                   <span>{nodeLabelByID.get(selectedEdge.source) || selectedEdge.source} → {nodeLabelByID.get(selectedEdge.target) || selectedEdge.target}</span>
                 </>
               ) : (
-                <>
-                  <strong>{selectedNode!.data.label}</strong>
-                  <span>{focus?.invocationPath || selectedNode!.data.workflowGroup}</span>
-                </>
+                <NodeDetails data={selectedNode!.data} path={focus?.invocationPath || selectedNode!.data.workflowGroup} />
               )}
             </div>
             <button

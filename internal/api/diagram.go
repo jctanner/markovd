@@ -16,18 +16,23 @@ type diagramWorkflowFile struct {
 }
 
 type diagramWorkflow struct {
-	Name  string        `yaml:"name"`
-	Steps []diagramStep `yaml:"steps"`
+	Name        string        `yaml:"name"`
+	Description string        `yaml:"description"`
+	Steps       []diagramStep `yaml:"steps"`
 }
 
 type diagramStep struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Type        string   `yaml:"type"`
-	ForEach     string   `yaml:"for_each"`
-	Workflow    string   `yaml:"workflow"`
-	When        string   `yaml:"when"`
-	Rules       []string `yaml:"rules"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Type        string `yaml:"type"`
+	ForEach     string `yaml:"for_each"`
+	// Shown in the definition graph\'s details panel.
+	ForEachWhen  string   `yaml:"for_each_when"`
+	IgnoreErrors bool     `yaml:"ignore_errors"`
+	FailedWhen   string   `yaml:"failed_when"`
+	Workflow     string   `yaml:"workflow"`
+	When         string   `yaml:"when"`
+	Rules        []string `yaml:"rules"`
 }
 
 type DiagramPosition struct {
@@ -41,6 +46,9 @@ type DiagramNodeData struct {
 	StepType       string   `json:"stepType"`
 	Category       string   `json:"category"`
 	ForEach        string   `json:"forEach,omitempty"`
+	ForEachWhen    string   `json:"forEachWhen,omitempty"`
+	IgnoreErrors   bool     `json:"ignoreErrors,omitempty"`
+	FailedWhen     string   `json:"failedWhen,omitempty"`
 	SubWorkflow    string   `json:"subWorkflow,omitempty"`
 	When           string   `json:"when,omitempty"`
 	Rules          []string `json:"rules,omitempty"`
@@ -339,6 +347,7 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 		Position: DiagramPosition{X: x, Y: y},
 		Data: DiagramNodeData{
 			Label:          invocation.definitionName,
+			Description:    invocation.definition.Description,
 			WorkflowGroup:  invocation.definitionName,
 			Category:       "group",
 			InvocationPath: invocation.path,
@@ -383,6 +392,9 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 				StepType:       step.Type,
 				Category:       stepCategory(step),
 				ForEach:        step.ForEach,
+				ForEachWhen:    step.ForEachWhen,
+				IgnoreErrors:   step.IgnoreErrors,
+				FailedWhen:     step.FailedWhen,
 				SubWorkflow:    step.Workflow,
 				When:           step.When,
 				Rules:          step.Rules,

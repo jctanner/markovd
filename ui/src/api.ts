@@ -168,6 +168,9 @@ export interface DiagramNodeData {
   stepType: string;
   category: string;
   forEach?: string;
+  forEachWhen?: string;
+  ignoreErrors?: boolean;
+  failedWhen?: string;
   subWorkflow?: string;
   when?: string;
   rules?: string[];
