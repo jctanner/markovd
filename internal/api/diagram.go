@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,10 +25,11 @@ type diagramWorkflow struct {
 }
 
 type diagramStep struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Type        string `yaml:"type"`
-	ForEach     string `yaml:"for_each"`
+	WorkflowNames []string `yaml:"workflow_names"`
+	Name          string   `yaml:"name"`
+	Description   string   `yaml:"description"`
+	Type          string   `yaml:"type"`
+	ForEach       string   `yaml:"for_each"`
 	// Shown in the definition graph\'s details panel.
 	ForEachWhen  string   `yaml:"for_each_when"`
 	IgnoreErrors bool     `yaml:"ignore_errors"`
@@ -58,6 +60,12 @@ type DiagramNodeData struct {
 	InvocationPath string   `json:"invocationPath,omitempty"`
 	CallerStep     string   `json:"callerStep,omitempty"`
 	ReferenceKind  string   `json:"referenceKind,omitempty"`
+	// For a templated call: the workflows it may resolve to, and where that list came from
+	// ("workflow_names" or "pattern"); empty when nothing could be found.
+	WorkflowNames  []string `json:"workflowNames,omitempty"`
+	CandidatesFrom string   `json:"candidatesFrom,omitempty"`
+	// For a group drawn as one possible target of a templated call: that call's template.
+	AlternativeOf string `json:"alternativeOf,omitempty"`
 }
 
 type DiagramNode struct {
@@ -110,14 +118,15 @@ type diagramInvocation struct {
 	callerStep     string
 	depth          int
 	recursive      bool
-	children       map[int]*diagramInvocation
+	children       map[int][]*diagramInvocation // several when a templated call has alternatives
 	stepSegments   []string
 	groupID        string
 	stepIDs        []string
 	entryID        string
 	exitID         string
 	subtreeHeight  float64
-	childOffsets   map[int]float64
+	alternativeOf  string // the templated name this group is one possible target of
+	childOffsets   map[int][]float64
 }
 
 type diagramExpansionBudget struct {
@@ -257,8 +266,8 @@ func buildDiagramInvocation(
 		callerStep:     callerStep,
 		depth:          depth,
 		recursive:      ancestry[name],
-		children:       make(map[int]*diagramInvocation),
-		childOffsets:   make(map[int]float64),
+		children:       make(map[int][]*diagramInvocation),
+		childOffsets:   make(map[int][]float64),
 		groupID:        "group:" + path,
 	}
 	if invocation.recursive {
@@ -284,17 +293,14 @@ func buildDiagramInvocation(
 		}
 		invocation.stepSegments = append(invocation.stepSegments, segment)
 		invocation.stepIDs = append(invocation.stepIDs, "step:"+path+"/"+segment)
-		// A templated name (`submit-{{ test.arm }}`) is resolved only when the step runs, so the
-		// diagram shows the call without expanding it.
-		if step.Workflow == "" || strings.Contains(step.Workflow, "{{") || strings.Contains(step.Workflow, "{%") {
-			continue
+		for _, target := range callTargets(step, wfMap) {
+			childPath := path + "/" + segment + "@" + invocationSegment(target)
+			child, err := buildDiagramInvocation(wfMap, target, childPath, step.Name, depth+1, ancestry, budget)
+			if err != nil {
+				return nil, err
+			}
+			invocation.children[i] = append(invocation.children[i], child)
 		}
-		childPath := path + "/" + segment + "@" + invocationSegment(step.Workflow)
-		child, err := buildDiagramInvocation(wfMap, step.Workflow, childPath, step.Name, depth+1, ancestry, budget)
-		if err != nil {
-			return nil, err
-		}
-		invocation.children[i] = child
 	}
 	invocation.entryID = invocation.stepIDs[0]
 	last := len(invocation.stepIDs) - 1
@@ -303,6 +309,92 @@ func buildDiagramInvocation(
 	// adjacent columns (ADR-0006).
 	invocation.exitID = invocation.stepIDs[last]
 	return invocation, nil
+}
+
+func isTemplatedName(name string) bool {
+	return strings.Contains(name, "{{") || strings.Contains(name, "{%")
+}
+
+// callTargets lists the workflows a step calls. A plain name is itself. A templated name is
+// resolved only when the step runs; the diagram shows its possible targets: the step's
+// workflow_names, or else the workflows whose names fit the template with each {{ }} or {% %}
+// read as a wildcard (submit-{{ test.arm }} fits submit-workflow and submit-bash). A template with
+// no fixed text fits nothing, rather than every workflow.
+func callTargets(step diagramStep, wfMap map[string]*diagramWorkflow) []string {
+	if step.Workflow == "" {
+		return nil
+	}
+	if !isTemplatedName(step.Workflow) {
+		return []string{step.Workflow}
+	}
+	if len(step.WorkflowNames) > 0 {
+		var out []string
+		for _, name := range step.WorkflowNames {
+			if wfMap[name] != nil {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	pattern := templatePattern(step.Workflow)
+	if pattern == nil {
+		return nil
+	}
+	var out []string
+	for name := range wfMap {
+		if pattern.MatchString(name) {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+var templateTag = regexp.MustCompile(`\{\{.*?\}\}|\{%.*?%\}`)
+
+func templatePattern(name string) *regexp.Regexp {
+	fixed := templateTag.Split(name, -1)
+	if strings.TrimSpace(strings.Join(fixed, "")) == "" {
+		return nil
+	}
+	for i := range fixed {
+		fixed[i] = regexp.QuoteMeta(fixed[i])
+	}
+	return regexp.MustCompile("^" + strings.Join(fixed, ".+") + "$")
+}
+
+func stepCandidates(invocation *diagramInvocation, i int) []string {
+	step := invocation.definition.Steps[i]
+	if !isTemplatedName(step.Workflow) {
+		return nil
+	}
+	var names []string
+	for _, child := range invocation.children[i] {
+		names = append(names, child.definitionName)
+	}
+	return names
+}
+
+func candidatesSource(step diagramStep) string {
+	switch {
+	case !isTemplatedName(step.Workflow):
+		return ""
+	case len(step.WorkflowNames) > 0:
+		return "workflow_names"
+	default:
+		return "pattern"
+	}
+}
+
+func markAlternative(edges *[]DiagramEdge, id string) {
+	for i := range *edges {
+		if (*edges)[i].ID == id {
+			if (*edges)[i].Data == nil {
+				(*edges)[i].Data = map[string]interface{}{}
+			}
+			(*edges)[i].Data["alternative"] = true
+		}
+	}
 }
 
 func invocationSegment(value string) string {
@@ -326,20 +418,19 @@ func measureDiagramInvocation(invocation *diagramInvocation) float64 {
 	height := invocationGroupHeight(invocation)
 	cursor := 0.0
 	for i := range invocation.definition.Steps {
-		child := invocation.children[i]
-		if child == nil {
-			continue
-		}
-		childHeight := measureDiagramInvocation(child)
-		// Align the child's first step with its caller, so the call edge is a straight line.
-		desired := float64(i) * (nodeH + nodeGapY)
-		if cursor > desired {
-			desired = cursor
-		}
-		invocation.childOffsets[i] = desired
-		cursor = desired + childHeight + groupGapY
-		if cursor-groupGapY > height {
-			height = cursor - groupGapY
+		for _, child := range invocation.children[i] {
+			childHeight := measureDiagramInvocation(child)
+			// Align the (first) child's first step with its caller, so the call edge is a straight
+			// line; alternatives stack below it.
+			desired := float64(i) * (nodeH + nodeGapY)
+			if cursor > desired {
+				desired = cursor
+			}
+			invocation.childOffsets[i] = append(invocation.childOffsets[i], desired)
+			cursor = desired + childHeight + groupGapY
+			if cursor-groupGapY > height {
+				height = cursor - groupGapY
+			}
 		}
 	}
 	invocation.subtreeHeight = height
@@ -375,6 +466,7 @@ func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float6
 			Category:       "group",
 			InvocationPath: invocation.path,
 			CallerStep:     invocation.callerStep,
+			AlternativeOf:  invocation.alternativeOf,
 		},
 		Style: map[string]interface{}{"width": nodeW + 2*groupPadX, "height": groupHeight},
 	})
@@ -424,6 +516,8 @@ func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float6
 				IgnoreErrors:   step.IgnoreErrors,
 				FailedWhen:     step.FailedWhen,
 				SubWorkflow:    step.Workflow,
+				WorkflowNames:  stepCandidates(invocation, i),
+				CandidatesFrom: candidatesSource(step),
 				When:           step.When,
 				Rules:          step.Rules,
 				WorkflowGroup:  invocation.definitionName,
@@ -435,9 +529,17 @@ func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float6
 		})
 	}
 
-	for i := range invocation.definition.Steps {
-		child := invocation.children[i]
-		if child != nil {
+	for i, step := range invocation.definition.Steps {
+		children := invocation.children[i]
+		if len(children) == 0 {
+			if i+1 < len(invocation.stepIDs) {
+				appendDiagramEdge(&l.edges, "sequence", invocation.stepIDs[i], invocation.stepIDs[i+1])
+			}
+			continue
+		}
+		// A templated call's targets are alternatives: exactly one runs.
+		alternative := isTemplatedName(step.Workflow)
+		for _, child := range children {
 			appendDiagramEdge(&l.edges, "call", invocation.stepIDs[i], child.entryID)
 			// The child returns to the next step, or, when the call is this workflow's last
 			// step, to the calling step itself (it completes when the child does).
@@ -446,17 +548,21 @@ func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float6
 				returnTo = invocation.stepIDs[i+1]
 			}
 			appendDiagramEdge(&l.edges, "return", child.exitID, returnTo)
-		} else if i+1 < len(invocation.stepIDs) {
-			appendDiagramEdge(&l.edges, "sequence", invocation.stepIDs[i], invocation.stepIDs[i+1])
+			if alternative {
+				for _, e := range l.edges[len(l.edges)-2:] {
+					markAlternative(&l.edges, e.ID)
+				}
+			}
 		}
 	}
 
-	for i := range invocation.definition.Steps {
-		child := invocation.children[i]
-		if child == nil {
-			continue
+	for i, step := range invocation.definition.Steps {
+		for k, child := range invocation.children[i] {
+			if isTemplatedName(step.Workflow) {
+				child.alternativeOf = step.Workflow
+			}
+			layoutDiagramInvocation(child, column+1, y+invocation.childOffsets[i][k], l)
 		}
-		layoutDiagramInvocation(child, column+1, y+invocation.childOffsets[i], l)
 	}
 }
 
@@ -558,7 +664,10 @@ func assignEdgeLanes(l *diagramLayout) map[int]int {
 		for _, le := range list {
 			e := &l.edges[le.edge]
 			e.Type = "lane"
-			e.Data = map[string]interface{}{"laneX": first + float64(le.lane)*laneSpacing}
+			if e.Data == nil {
+				e.Data = map[string]interface{}{}
+			}
+			e.Data["laneX"] = first + float64(le.lane)*laneSpacing
 		}
 	}
 	return lanes

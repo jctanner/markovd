@@ -55,3 +55,24 @@ of each other.
 - Layout logic lives in `internal/api/diagram.go` (`assignEdgeLanes`,
   `bestLaneOrder`). The UI only draws the path through `laneX`
   (`LaneEdge`).
+
+## Addendum (2026-10-10): templated calls
+
+Markov resolves a templated sub-workflow name (`submit-{{ test.arm }}`) when
+the step runs. The diagram draws its possible targets as alternatives:
+
+- **Which targets:**
+  - the step's `workflow_names` (Markov `2caa232`) when it has them;
+  - otherwise the workflows whose names fit the template, with each
+    `{{ }}`/`{% %}` read as a wildcard;
+  - a template with no fixed text fits nothing, rather than every workflow,
+    and the step continues by sequence as before.
+- **Layout:** each target is a group in the next column, stacked one above
+  the other. The call and return edges are marked `data.alternative` and
+  drawn fainter, because only one target runs. They are routed in lanes like
+  any other edge.
+- **Labels:**
+  - the step node lists its candidates (`workflowNames`) and where they came
+    from (`candidatesFrom`: `workflow_names` or `pattern`);
+  - each target group carries `alternativeOf` and shows "one possible
+    target" in its header.

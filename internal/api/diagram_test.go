@@ -343,7 +343,8 @@ func assertNoEdge(t *testing.T, diagram *DiagramResponse, source, target string)
 	}
 }
 
-func TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded(t *testing.T) {
+func templatedDiagram(t *testing.T, mainYAML string) *DiagramResponse {
+	t.Helper()
 	diagram, err := generateDiagramFromDefinition(models.WorkflowDefinition{
 		Kind: workflowdef.KindDirectory,
 		Files: []models.WorkflowDefinitionFile{
@@ -351,22 +352,78 @@ func TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded(t *testing.T) {
 			{Path: "vars.yaml", Content: "{}\n"},
 			{Path: "rules.yaml", Content: "[]\n"},
 			{Path: "step_types.yaml", Content: "{}\n"},
-			{Path: "workflows/main.yaml", Content: "name: main\nsteps:\n  - name: submit\n    description: Submit the arm's job\n    workflow: \"submit-{{ test.arm }}\"\n"},
-			{Path: "workflows/a.yaml", Content: "name: submit-bash\nsteps:\n  - name: done\n    type: shell_exec\n"},
+			{Path: "workflows/main.yaml", Content: mainYAML},
+			{Path: "workflows/a.yaml", Content: "name: submit-bash\nsteps:\n  - name: b\n    type: shell_exec\n"},
+			{Path: "workflows/b.yaml", Content: "name: submit-workflow\nsteps:\n  - name: w\n    type: shell_exec\n"},
+			{Path: "workflows/c.yaml", Content: "name: other\nsteps:\n  - name: o\n    type: shell_exec\n"},
 		},
 	})
 	if err != nil {
 		t.Fatalf("generateDiagramFromDefinition() error: %v", err)
 	}
-	for _, node := range diagram.Nodes {
-		if node.Data.Label == "submit" {
-			if node.Data.SubWorkflow != "submit-{{ test.arm }}" || node.Data.Description != "Submit the arm's job" {
-				t.Fatalf("node data = %#v", node.Data)
-			}
-			return
+	return diagram
+}
+
+func nodeByLabel(d *DiagramResponse, label string) *DiagramNodeData {
+	for i := range d.Nodes {
+		if d.Nodes[i].Data.Label == label {
+			return &d.Nodes[i].Data
 		}
 	}
-	t.Fatalf("submit step missing: %#v", diagram.Nodes)
+	return nil
+}
+
+func TestTemplatedCallExpandsPatternMatchesAsAlternatives(t *testing.T) {
+	d := templatedDiagram(t, "name: main\nsteps:\n  - name: submit\n    description: Submit the arm's job\n    workflow: \"submit-{{ test.arm }}\"\n  - name: after\n    type: shell_exec\n")
+	submit := nodeByLabel(d, "submit")
+	if submit == nil || submit.SubWorkflow != "submit-{{ test.arm }}" || submit.CandidatesFrom != "pattern" ||
+		strings.Join(submit.WorkflowNames, ",") != "submit-bash,submit-workflow" {
+		t.Fatalf("submit = %#v", submit)
+	}
+	for _, name := range []string{"submit-bash", "submit-workflow"} {
+		g := nodeByLabel(d, name)
+		if g == nil || g.AlternativeOf != "submit-{{ test.arm }}" {
+			t.Fatalf("group %s = %#v", name, g)
+		}
+	}
+	if nodeByLabel(d, "other") != nil {
+		t.Fatal("a workflow that doesn't fit the template was drawn")
+	}
+	assertEdge(t, d, "call", "step:main/submit", "step:main/submit@submit-bash/b")
+	assertEdge(t, d, "return", "step:main/submit@submit-workflow/w", "step:main/after")
+	for _, e := range d.Edges {
+		if e.Relation != "sequence" && e.Data["alternative"] != true {
+			t.Fatalf("edge %s not marked alternative: %#v", e.ID, e.Data)
+		}
+		if e.Relation != "sequence" && e.Data["laneX"] == nil {
+			t.Fatalf("edge %s lost its lane: %#v", e.ID, e.Data)
+		}
+	}
+}
+
+func TestTemplatedCallUsesWorkflowNames(t *testing.T) {
+	d := templatedDiagram(t, "name: main\nsteps:\n  - name: submit\n    workflow: \"{{ target }}\"\n    workflow_names: [other, submit-bash]\n")
+	submit := nodeByLabel(d, "submit")
+	if submit == nil || submit.CandidatesFrom != "workflow_names" || strings.Join(submit.WorkflowNames, ",") != "other,submit-bash" {
+		t.Fatalf("submit = %#v", submit)
+	}
+	if nodeByLabel(d, "submit-workflow") != nil {
+		t.Fatal("an unlisted workflow was drawn")
+	}
+}
+
+func TestFullyDynamicTemplateWithoutNamesIsUnresolved(t *testing.T) {
+	d := templatedDiagram(t, "name: main\nsteps:\n  - name: submit\n    workflow: \"{{ target }}\"\n  - name: after\n    type: shell_exec\n")
+	submit := nodeByLabel(d, "submit")
+	if submit == nil || len(submit.WorkflowNames) != 0 || submit.CandidatesFrom != "pattern" {
+		t.Fatalf("submit = %#v", submit)
+	}
+	for _, name := range []string{"submit-bash", "submit-workflow", "other"} {
+		if nodeByLabel(d, name) != nil {
+			t.Fatalf("%s drawn for a template with no fixed text", name)
+		}
+	}
+	assertEdge(t, d, "sequence", "step:main/submit", "step:main/after")
 }
 
 func TestGenerateDiagramCarriesDescriptionsAndStepDetails(t *testing.T) {

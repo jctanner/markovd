@@ -213,6 +213,7 @@ function StructureReferenceNode({ data }: NodeProps<Node<StructureNodeData>>) {
 type GroupNodeData = {
   label: string;
   description?: string;
+  alternativeOf?: string;
   workflowGroup: string;
   category: string;
   callerStep?: string;
@@ -222,7 +223,11 @@ function WorkflowGroupNode({ data }: NodeProps<Node<GroupNodeData>>) {
   return (
     <div className="struct-group-node">
       <div className="struct-group-label">{data.label}</div>
-      {data.callerStep && <div className="struct-group-caller">via {data.callerStep}</div>}
+      {data.callerStep && (
+        <div className="struct-group-caller" title={data.alternativeOf ? `${data.callerStep} calls ${data.alternativeOf}; this is one workflow it may resolve to` : undefined}>
+          via {data.callerStep}{data.alternativeOf && <span className="struct-group-alternative"> · one possible target</span>}
+        </div>
+      )}
       {data.description && (
         <div className="struct-group-description" title={data.description}>{data.description}</div>
       )}
@@ -278,6 +283,11 @@ function NodeDetails({ data, path }: { data: DiagramNode['data']; path: string }
     if (data.forEach) rows.push(['for_each', data.forEach]);
     if (data.forEachWhen) rows.push(['for_each_when', data.forEachWhen]);
     if (data.subWorkflow) rows.push(['workflow', data.subWorkflow]);
+    if (data.candidatesFrom) {
+      rows.push(['may call', data.workflowNames?.length
+        ? `${data.workflowNames.join(', ')} (${data.candidatesFrom === 'workflow_names' ? 'workflow_names' : 'matched by name'})`
+        : 'resolved at run time; no workflow_names, and no workflow name fits the template']);
+    }
     if (data.rules?.length) rows.push(['rules', data.rules.join(', ')]);
     if (data.failedWhen) rows.push(['failed_when', data.failedWhen]);
     if (data.ignoreErrors) rows.push(['ignore_errors', 'true']);
@@ -391,7 +401,8 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
         ...(relation === 'call' ? { strokeDasharray: '8 4' } : {}),
         ...(relation === 'return' ? { strokeDasharray: '3 4' } : {}),
         ...e.style,
-        opacity: focus && !inFocus ? 0.12 : 1,
+        // A templated call's targets are alternatives (only one runs): draw them fainter.
+        opacity: focus && !inFocus ? 0.12 : (e.data?.alternative && !inFocus ? 0.55 : 1),
       },
     };
   }), [rawEdges, focus, selection, nodeLabelByID]);

@@ -178,6 +178,12 @@ export interface DiagramNodeData {
   invocationPath?: string;
   callerStep?: string;
   referenceKind?: string;
+  // A templated call's possible targets, and whether they came from workflow_names or from
+  // matching the template against workflow names.
+  workflowNames?: string[];
+  candidatesFrom?: 'workflow_names' | 'pattern';
+  // On a group: the templated call it is one possible target of.
+  alternativeOf?: string;
 }
 
 export interface DiagramNode {
@@ -201,7 +207,7 @@ export interface DiagramEdge {
   relation?: 'sequence' | 'call' | 'return';
   style?: Record<string, string | number>;
   // Routing hints from the server: laneX for call and return edges.
-  data?: { laneX?: number };
+  data?: { laneX?: number; alternative?: boolean };
 }
 
 export interface DiagramResponse {

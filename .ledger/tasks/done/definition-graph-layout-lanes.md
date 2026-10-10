@@ -28,3 +28,13 @@ Changes follow [ADR-0006](../../decisions/ADR-0006-adjacent-column-returns-and-e
 - `ui`: `tsc --noEmit`, `npm test` and `npm run build` pass.
 - Before and after screenshots of the deployed page are in the session
   notes. See Breadboard's plan observations, 2026-10-10.
+
+## Follow-up: templated calls drawn as alternatives
+
+See the addendum in ADR-0006. Tests:
+- `TestTemplatedCallExpandsPatternMatchesAsAlternatives` (pattern matching,
+  alternative and lane data on edges, non-matching workflows left out);
+- `TestTemplatedCallUsesWorkflowNames`;
+- `TestFullyDynamicTemplateWithoutNamesIsUnresolved`.
+
+They replace `TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded`.

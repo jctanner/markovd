@@ -2079,6 +2079,10 @@ td.cell-link a:hover {
   font-size: 10px;
 }
 
+.struct-group-alternative {
+  color: var(--status-skipped);
+}
+
 .struct-group-caller {
   padding: 0 14px;
   font-family: var(--font-mono);
