@@ -38,3 +38,23 @@ out on the server, so long text doesn't belong in them.
   - `describe_run` has the notes icon;
   - the `run-test` header shows its one-line description above the first
     card.
+
+## Follow-up: the run graph gets the same legend and panel
+
+The run page's graph (`WorkflowGraph.tsx`) had no legend, and a click went
+straight to the step dialog. Now (`5a461b4`, `0da3bb1`):
+
+- **Legend:** line kinds (sequence; into a sub-workflow or `for_each`
+  branch, and back) and status colours.
+- **Click selects a step.** The panel shows the step's definition through
+  the shared `NodeDetails` (description, `when`, `for_each`, called
+  workflow, `failed_when`, `ignore_errors`), then this run's status,
+  duration, Job and error.
+- **Button:** "Details & live log" opens the step dialog.
+- **Where the definition data comes from:** RunDetail passes the
+  diagram's step data, keyed by workflow and step (`for_each` items and
+  rescue/always steps use their step's entry).
+
+Checked on `markov-run-9d30a751`: selecting the running `wait_for_run`
+showed its description, `ignore_errors: true`, status, duration and job
+name.
