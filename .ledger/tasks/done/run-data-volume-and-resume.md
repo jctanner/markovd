@@ -91,3 +91,12 @@ Found and fixed along the way:
 The reconcile followed the resume Job (`runs.job_name`). Importing right
 after a markovd restart, with no new sync, worked, because the clones are
 now on the volume.
+
+## Follow-up (2026-10-10): templated sub-workflow names
+
+Markov `d9b2b8e` lets `workflow:` be a template, resolved when the step
+runs. The diagram used to fail on such a name, as an undefined workflow. It
+now shows the call with its template (`submit-{{ test.arm }}`) and doesn't
+expand it (`0b3ebc7`, `TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded`).
+Checked on Breadboard's strat-workflow diagram: 37 nodes, with the templated
+call shown.
