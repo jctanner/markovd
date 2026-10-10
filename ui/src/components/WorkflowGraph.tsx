@@ -972,10 +972,13 @@ export default function WorkflowGraph({ steps, onStepClick, definitions }: Props
       if (meta) setActiveFork(meta);
       return;
     }
-    // A click selects the step and shows its details in the legend panel; the panel opens the
-    // step dialog (output, live log).
-    if (stepMap.has(node.id)) setSelectedId(node.id);
-  }, [stepMap, collapsedForks]);
+    // A click opens the step dialog straight away (the quickest way to a live log) and selects the
+    // step, so the legend panel keeps its details after the dialog closes.
+    const step = stepMap.get(node.id);
+    if (!step) return;
+    setSelectedId(node.id);
+    if (onStepClick) onStepClick(step);
+  }, [onStepClick, stepMap, collapsedForks]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

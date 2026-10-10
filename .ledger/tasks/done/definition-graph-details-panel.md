@@ -46,11 +46,13 @@ straight to the step dialog. Now (`5a461b4`, `0da3bb1`):
 
 - **Legend:** line kinds (sequence; into a sub-workflow or `for_each`
   branch, and back) and status colours.
-- **Click selects a step.** The panel shows the step's definition through
+- **Click opens the step dialog straight away** (the quickest way to a
+  live log) and selects the step. The panel then shows the step's definition through
   the shared `NodeDetails` (description, `when`, `for_each`, called
   workflow, `failed_when`, `ignore_errors`), then this run's status,
   duration, Job and error.
-- **Button:** "Details & live log" opens the step dialog.
+- **Button:** "Details & live log" reopens the step dialog after it's
+  closed.
 - **Where the definition data comes from:** RunDetail passes the
   diagram's step data, keyed by workflow and step (`for_each` items and
   rescue/always steps use their step's entry).
