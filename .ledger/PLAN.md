@@ -31,6 +31,7 @@ None.
 
 ## Done Tasks
 
+- [Show workflow and step descriptions in the definition graph](tasks/done/definition-graph-details-panel.md)
 - [Keep runs on a data volume, resume runs, show step descriptions](tasks/done/run-data-volume-and-resume.md)
 - [Keep all files on project import and record the source commit](tasks/done/project-import-all-files-and-source-commit.md)
 - [Improve workflow definition edge readability](tasks/done/improve-workflow-definition-edge-readability.md)
