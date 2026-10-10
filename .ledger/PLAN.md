@@ -32,6 +32,7 @@ None.
 
 ## Done Tasks
 
+- [Cancelling a run stops the Jobs its steps are attached to](tasks/done/cancel-stops-step-jobs.md)
 - [Definition graph layout: adjacent returns, edge lanes, alignment, spacing](tasks/done/definition-graph-layout-lanes.md)
 - [Show workflow and step descriptions in the definition graph](tasks/done/definition-graph-details-panel.md)
 - [Keep runs on a data volume, resume runs, show step descriptions](tasks/done/run-data-volume-and-resume.md)

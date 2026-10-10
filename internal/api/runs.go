@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -238,6 +239,7 @@ func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	if err := s.runner.Cancel(runID); err != nil {
 		log.Printf("Warning: cancel runner for %s: %v", runID, err)
 	}
+	s.stopStepJobs(r.Context(), runID)
 
 	now := time.Now()
 	if err := s.db.UpdateRunStatus(r.Context(), runID, "cancelled", &now); err != nil {
@@ -248,6 +250,29 @@ func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	run.Status = "cancelled"
 	run.CompletedAt = &now
 	writeJSON(w, http.StatusOK, run)
+}
+
+// stopStepJobs stops the Jobs a run's running steps are attached to and marks those steps
+// cancelled. Cancelling the run's runner stops Markov but not Jobs it started or is waiting on,
+// such as dashboard jobs submitted through an API and watched with k8s_job_wait; they would run
+// on and could collide with the next run. Call it after the runner is stopped, so no new Job
+// appears in between (one submitted in the last instant before its wait step reports it can
+// still be missed).
+func (s *Server) stopStepJobs(ctx context.Context, runID string) {
+	jobs, err := s.db.ListActiveStepJobs(ctx, runID)
+	if err != nil {
+		log.Printf("Warning: list step jobs of %s: %v", runID, err)
+		return
+	}
+	now := time.Now()
+	for _, j := range jobs {
+		if err := s.runner.Cancel(j.JobName); err != nil {
+			log.Printf("Warning: stop job %s of step %s/%s in %s: %v", j.JobName, j.WorkflowName, j.StepName, runID, err)
+		} else {
+			log.Printf("Stopped job %s of step %s/%s in %s", j.JobName, j.WorkflowName, j.StepName, runID)
+		}
+		_ = s.db.UpdateStepStatus(ctx, runID, j.ForkID, j.WorkflowName, j.StepName, "cancelled", &now)
+	}
 }
 
 func (s *Server) handleActiveJobs(w http.ResponseWriter, r *http.Request) {
@@ -486,6 +511,7 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, r *http.Request) {
 		if err := s.runner.Cancel(req.RunID); err != nil {
 			log.Printf("Warning: cancel runner for %s: %v", req.RunID, err)
 		}
+		s.stopStepJobs(r.Context(), req.RunID)
 		if err := s.db.UpdateRunStatus(r.Context(), req.RunID, "cancelled", &now); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update run status"})
 			return
@@ -540,6 +566,7 @@ func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	if err := s.runner.Delete(runID); err != nil {
 		log.Printf("Warning: cleanup K8s resources for %s: %v", runID, err)
 	}
+	s.stopStepJobs(r.Context(), runID)
 
 	if err := s.db.DeleteRun(r.Context(), runID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete run"})

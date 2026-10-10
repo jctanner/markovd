@@ -83,6 +83,37 @@ func (d *DB) UpdateStepStatus(ctx context.Context, runID, forkID, workflowName, 
 	return err
 }
 
+// ActiveStepJob is a running or pending step attached to a Kubernetes Job.
+type ActiveStepJob struct {
+	ForkID       string
+	WorkflowName string
+	StepName     string
+	JobName      string
+}
+
+// ListActiveStepJobs lists a run's running or pending steps that have a Job: one Markov created
+// (k8s_job) or one it watches (k8s_job_wait), both reported through job_created.
+func (d *DB) ListActiveStepJobs(ctx context.Context, runID string) ([]ActiveStepJob, error) {
+	rows, err := d.QueryContext(ctx,
+		`SELECT COALESCE(fork_id, ''), workflow_name, step_name, output_json::jsonb->>'job_name'
+		 FROM steps
+		 WHERE run_id = $1 AND status IN ('running', 'pending')
+		   AND COALESCE(output_json::jsonb->>'job_name', '') != ''`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("listing active step jobs: %w", err)
+	}
+	defer rows.Close()
+	var jobs []ActiveStepJob
+	for rows.Next() {
+		var j ActiveStepJob
+		if err := rows.Scan(&j.ForkID, &j.WorkflowName, &j.StepName, &j.JobName); err != nil {
+			return nil, fmt.Errorf("scanning active step job: %w", err)
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
 func (d *DB) UpsertStep(ctx context.Context, runID, forkID, workflowName, stepName, stepType, status, outputJSON, stepError string, startedAt, completedAt *time.Time) error {
 	_, err := d.ExecContext(ctx,
 		`INSERT INTO steps (run_id, fork_id, workflow_name, step_name, step_type, status, output_json, error, started_at, completed_at, updated_at)
