@@ -90,7 +90,7 @@ const (
 	nodeH                 = 72.0
 	nodeGapY              = 60.0
 	groupPadX             = 30.0
-	groupPadTop           = 72.0
+	groupPadTop           = 90.0 // name, "via <caller>" and a one-line description
 	groupPadBot           = 20.0
 	colGap                = 80.0
 	groupGapY             = 40.0
