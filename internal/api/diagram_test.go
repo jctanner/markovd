@@ -337,3 +337,29 @@ func assertNoEdge(t *testing.T, diagram *DiagramResponse, source, target string)
 		}
 	}
 }
+
+func TestGenerateDiagramLeavesTemplatedWorkflowUnexpanded(t *testing.T) {
+	diagram, err := generateDiagramFromDefinition(models.WorkflowDefinition{
+		Kind: workflowdef.KindDirectory,
+		Files: []models.WorkflowDefinitionFile{
+			{Path: "meta.yaml", Content: "entrypoint: main\n"},
+			{Path: "vars.yaml", Content: "{}\n"},
+			{Path: "rules.yaml", Content: "[]\n"},
+			{Path: "step_types.yaml", Content: "{}\n"},
+			{Path: "workflows/main.yaml", Content: "name: main\nsteps:\n  - name: submit\n    description: Submit the arm's job\n    workflow: \"submit-{{ test.arm }}\"\n"},
+			{Path: "workflows/a.yaml", Content: "name: submit-bash\nsteps:\n  - name: done\n    type: shell_exec\n"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generateDiagramFromDefinition() error: %v", err)
+	}
+	for _, node := range diagram.Nodes {
+		if node.Data.Label == "submit" {
+			if node.Data.SubWorkflow != "submit-{{ test.arm }}" || node.Data.Description != "Submit the arm's job" {
+				t.Fatalf("node data = %#v", node.Data)
+			}
+			return
+		}
+	}
+	t.Fatalf("submit step missing: %#v", diagram.Nodes)
+}

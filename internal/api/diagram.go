@@ -270,7 +270,9 @@ func buildDiagramInvocation(
 		}
 		invocation.stepSegments = append(invocation.stepSegments, segment)
 		invocation.stepIDs = append(invocation.stepIDs, "step:"+path+"/"+segment)
-		if step.Workflow == "" {
+		// A templated name (`submit-{{ test.arm }}`) is resolved only when the step runs, so the
+		// diagram shows the call without expanding it.
+		if step.Workflow == "" || strings.Contains(step.Workflow, "{{") || strings.Contains(step.Workflow, "{%") {
 			continue
 		}
 		childPath := path + "/" + segment + "@" + invocationSegment(step.Workflow)
