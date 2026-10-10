@@ -100,7 +100,7 @@ func TestResumeStartsResumeJobWithSameRunData(t *testing.T) {
 		t.Fatalf("resume Job not created: %v", err)
 	}
 	c := job.Spec.Template.Spec.Containers[0]
-	if strings.Join(c.Args[:3], " ") != "resume "+runID+" --verbose" || !strings.Contains(strings.Join(c.Args, " "), "--var reviewed=true") {
+	if strings.Join(c.Args[:5], " ") != "resume "+runID+" --verbose --namespace ai-pipeline" || !strings.Contains(strings.Join(c.Args, " "), "--var reviewed=true") {
 		t.Fatalf("args = %v", c.Args)
 	}
 	if c.VolumeMounts[0].SubPath != "runs/"+runID || job.Labels["markov/run-id"] != runID {

@@ -152,7 +152,7 @@ func (r *KubernetesRunner) Resume(ctx context.Context, req ResumeRequest) (strin
 	rand.Read(b)
 	jobName := fmt.Sprintf("%s-resume-%s", req.RunID, hex.EncodeToString(b))
 
-	args := []string{"resume", req.RunID, "--verbose"}
+	args := []string{"resume", req.RunID, "--verbose", "--namespace", r.namespace}
 	args = append(args, callbackArgs(req.CallbackURL, req.CallbackToken)...)
 	args = append(args, varArgs(req.Vars)...)
 	if err := r.createJob(ctx, jobName, req.RunID, args, r.dataMounts(req.RunID), req.Volumes, req.SecretVolumes); err != nil {
