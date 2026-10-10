@@ -117,9 +117,11 @@ type StructureNodeData = {
   referenceKind?: string;
 };
 
-// Must match callHandleFrac and returnHandleFrac in markovd's diagram.go.
-const CALL_HANDLE_TOP = '35%';
-const RETURN_HANDLE_TOP = '65%';
+// Must match callHandleFrac and returnHandleFrac (of nodeH = 72) in markovd's diagram.go. Pixels,
+// not percentages: cards with more lines (sub-workflow, for_each) render taller than 72px, and
+// the server routes edges assuming these exact offsets.
+const CALL_HANDLE_TOP = 25;
+const RETURN_HANDLE_TOP = 47;
 
 // A call or return edge routed through the lane the server assigned in its gap (data.laneX), so
 // edges crossing the same gap never share a vertical segment.

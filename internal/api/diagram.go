@@ -460,9 +460,9 @@ func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float6
 	}
 }
 
-// Where call and return edges meet a step card, as a fraction of its height. The UI places the
-// handles at the same heights (SemanticHandles), so a call and a return at one card don't share
-// a point.
+// Where call and return edges meet a step card, as a fraction of nodeH (25px and 47px). The UI
+// places the handles at those pixel offsets (SemanticHandles), so a call and a return at one
+// card don't share a point, and taller cards don't move them.
 const (
 	callHandleFrac   = 0.35
 	returnHandleFrac = 0.65

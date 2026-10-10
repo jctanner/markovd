@@ -36,9 +36,10 @@ of each other.
    - lane order in a gap is chosen to minimise crossings (exhaustively, up to
      seven lanes);
    - a gap widens beyond the 80px minimum to fit its lanes.
-4. **Separate handles.** Calls meet a card at 35% of its height and returns
-   at 65%, so a step that is both a caller and a return target doesn't merge
-   the two lines.
+4. **Separate handles.** Calls meet a card 25px from its top and returns at
+   47px (35% and 65% of the 72px card the layout assumes). A step that is
+   both a caller and a return target doesn't merge the two lines, and taller
+   cards don't shift the handles away from the routing.
 5. **Alignment.** A child group is placed so that its first step is level
    with its caller, which makes the call a straight line, unless an earlier
    group in the same column is in the way.
