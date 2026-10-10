@@ -52,6 +52,11 @@ planning Breadboard's strat-workflow benchmark
   2/2 Running, startup log clean, `/api/v1/health` 200. Postgres has
   `workflows.source_commit` and `runs.workflow_source_commit`. Existing
   imported workflows have an empty commit until their project's next sync.
-- End-to-end check pending: sync project 1 (`ai-first-pipeline`, Breadboard),
-  then confirm the linked workflows carry a commit and directory workflows
-  keep their non-YAML files.
+- End-to-end, 2026-10-10, after `make host-rebuild-markovd` with `d923fe5`:
+  synced project 1 (`ai-first-pipeline`, Breadboard) and imported
+  `var/benchmarks/strat-workflow`. The workflow
+  `var-benchmarks-strat-workflow` has `source_commit` `921cce9…` (Breadboard
+  HEAD) and all 30 files, including `scripts/*.py`, `scripts/*.sh`, `data/`
+  and `README.md`.
+- Still to see: a run started from markovd carrying `workflow_source_commit`
+  in its vars (the first benchmark run will show it).
