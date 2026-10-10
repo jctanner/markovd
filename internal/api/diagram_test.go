@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -137,7 +138,7 @@ func TestGenerateDiagramExpandsRepeatedWorkflowByCallSite(t *testing.T) {
 	assertNoEdge(t, diagram, secondCall, after)
 }
 
-func TestGenerateDiagramPropagatesFinalNestedCallExit(t *testing.T) {
+func TestGenerateDiagramReturnsStayBetweenAdjacentColumns(t *testing.T) {
 	diagram, err := generateDiagram(diagramWorkflowFile{
 		Entrypoint: "main",
 		Workflows: []diagramWorkflow{
@@ -156,8 +157,12 @@ func TestGenerateDiagramPropagatesFinalNestedCallExit(t *testing.T) {
 	after := "step:main/after"
 	assertEdge(t, diagram, "call", parentStep, parentEntry)
 	assertEdge(t, diagram, "call", parentEntry, leafExit)
-	assertEdge(t, diagram, "return", leafExit, after)
+	// leaf returns into the step that called it (parent's last step); parent returns from that
+	// step to main's next step. No return skips a column (ADR-0006).
+	assertEdge(t, diagram, "return", leafExit, parentEntry)
+	assertEdge(t, diagram, "return", parentEntry, after)
 	assertNoEdge(t, diagram, parentStep, after)
+	assertNoEdge(t, diagram, leafExit, after)
 }
 
 func TestGenerateDiagramForEachUsesOneTemplateAndJoin(t *testing.T) {
@@ -404,4 +409,129 @@ steps:
 	if step == nil || step.Description != "One per item" || step.ForEachWhen != "item.on" || !step.IgnoreErrors || step.FailedWhen != "result.rc != 0" {
 		t.Fatalf("step = %#v", step)
 	}
+}
+
+// strat-workflow's shape: a long caller with two calls, the second nested three deep.
+func benchmarkShapedDiagram(t *testing.T) *DiagramResponse {
+	t.Helper()
+	steps := func(names ...string) []diagramStep {
+		out := make([]diagramStep, len(names))
+		for i, n := range names {
+			out[i] = diagramStep{Name: n, Type: "shell_exec"}
+		}
+		return out
+	}
+	main := steps("a", "b", "c", "d", "e", "wipe", "rounds", "summarize", "save", "review")
+	main[5] = diagramStep{Name: "wipe", Workflow: "wipe"}
+	main[6] = diagramStep{Name: "rounds", Workflow: "round", ForEach: "x"}
+	round := []diagramStep{{Name: "tests", Workflow: "variants", ForEach: "x"}}
+	variants := []diagramStep{{Name: "variants", Workflow: "run-test", ForEach: "x"}}
+	diagram, err := generateDiagram(diagramWorkflowFile{
+		Entrypoint: "main",
+		Workflows: []diagramWorkflow{
+			{Name: "main", Steps: main},
+			{Name: "wipe", Steps: steps("w1", "w2", "w3", "w4")},
+			{Name: "round", Steps: round},
+			{Name: "variants", Steps: variants},
+			{Name: "run-test", Steps: steps("r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generateDiagram() error: %v", err)
+	}
+	return diagram
+}
+
+func TestDiagramLanesKeepEdgesApart(t *testing.T) {
+	diagram := benchmarkShapedDiagram(t)
+	pos := absolutePositions(diagram)
+	type seg struct {
+		x, lo, hi float64
+		id        string
+	}
+	var segs []seg
+	for _, e := range diagram.Edges {
+		if e.Relation == "sequence" {
+			continue
+		}
+		if e.Type != "lane" {
+			t.Fatalf("%s edge %s has type %q, want lane", e.Relation, e.ID, e.Type)
+		}
+		x, ok := e.Data["laneX"].(float64)
+		if !ok {
+			t.Fatalf("edge %s has no laneX: %#v", e.ID, e.Data)
+		}
+		frac := callHandleFrac
+		if e.Relation == "return" {
+			frac = returnHandleFrac
+		}
+		y1, y2 := pos[e.Source].Y+frac*nodeH, pos[e.Target].Y+frac*nodeH
+		// The lane lies between the two columns, clear of both groups.
+		left, right := math.Min(pos[e.Source].X, pos[e.Target].X), math.Max(pos[e.Source].X, pos[e.Target].X)
+		if x <= left+nodeW+groupPadX || x >= right-groupPadX {
+			t.Fatalf("edge %s lane x=%v is not in the gap between %v and %v", e.ID, x, left+nodeW+groupPadX, right-groupPadX)
+		}
+		segs = append(segs, seg{x: x, lo: math.Min(y1, y2), hi: math.Max(y1, y2), id: e.ID})
+	}
+	for i := range segs {
+		for j := i + 1; j < len(segs); j++ {
+			a, b := segs[i], segs[j]
+			if a.x == b.x && a.lo <= b.hi && b.lo <= a.hi && a.hi > a.lo && b.hi > b.lo {
+				t.Fatalf("edges share a vertical segment at x=%v: %s [%v,%v] and %s [%v,%v]", a.x, a.id, a.lo, a.hi, b.id, b.lo, b.hi)
+			}
+		}
+	}
+}
+
+func TestDiagramAlignsChildEntryWithCaller(t *testing.T) {
+	diagram := benchmarkShapedDiagram(t)
+	pos := absolutePositions(diagram)
+	// Each child entry lines up with its caller unless an earlier group in the same column is in
+	// the way: here wipe's group pushes round below the rounds step.
+	blocked := map[string]bool{"edge:call:step:main/rounds->step:main/rounds@round/tests": true}
+	for _, e := range diagram.Edges {
+		if e.Relation != "call" {
+			continue
+		}
+		aligned := pos[e.Source].Y == pos[e.Target].Y
+		if aligned == blocked[e.ID] {
+			t.Errorf("call %s: caller at y=%v, child entry at y=%v (blocked=%v)", e.ID, pos[e.Source].Y, pos[e.Target].Y, blocked[e.ID])
+		}
+	}
+	// Groups in one column must not overlap.
+	type box struct{ x, top, bottom float64 }
+	var groups []box
+	for _, n := range diagram.Nodes {
+		if n.Type == "group" {
+			h := n.Style["height"].(float64)
+			groups = append(groups, box{n.Position.X, n.Position.Y, n.Position.Y + h})
+		}
+	}
+	for i := range groups {
+		for j := i + 1; j < len(groups); j++ {
+			a, b := groups[i], groups[j]
+			if a.x == b.x && a.top < b.bottom && b.top < a.bottom {
+				t.Fatalf("groups overlap: %#v and %#v", a, b)
+			}
+		}
+	}
+}
+
+// absolutePositions resolves step positions (relative to their group) to canvas positions.
+func absolutePositions(d *DiagramResponse) map[string]DiagramPosition {
+	groups := map[string]DiagramPosition{}
+	for _, n := range d.Nodes {
+		if n.Type == "group" {
+			groups[n.ID] = n.Position
+		}
+	}
+	out := map[string]DiagramPosition{}
+	for _, n := range d.Nodes {
+		p := n.Position
+		if g, ok := groups[n.ParentID]; ok {
+			p = DiagramPosition{X: g.X + p.X, Y: g.Y + p.Y}
+		}
+		out[n.ID] = p
+	}
+	return out
 }

@@ -200,6 +200,8 @@ export interface DiagramEdge {
   animated: boolean;
   relation?: 'sequence' | 'call' | 'return';
   style?: Record<string, string | number>;
+  // Routing hints from the server: laneX for call and return edges.
+  data?: { laneX?: number };
 }
 
 export interface DiagramResponse {

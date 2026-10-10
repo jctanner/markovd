@@ -2,7 +2,9 @@ package api
 
 import (
 	"fmt"
+	"math"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/jctanner/markovd/internal/models"
@@ -78,6 +80,9 @@ type DiagramEdge struct {
 	Animated     bool                   `json:"animated"`
 	Style        map[string]interface{} `json:"style,omitempty"`
 	Relation     string                 `json:"relation,omitempty"`
+	// Data carries routing hints: laneX, the x of the vertical segment for a call or return
+	// edge (see assignEdgeLanes).
+	Data map[string]interface{} `json:"data,omitempty"`
 }
 
 type DiagramResponse struct {
@@ -88,11 +93,11 @@ type DiagramResponse struct {
 const (
 	nodeW                 = 260.0
 	nodeH                 = 72.0
-	nodeGapY              = 60.0
+	nodeGapY              = 36.0
 	groupPadX             = 30.0
 	groupPadTop           = 90.0 // name, "via <caller>" and a one-line description
 	groupPadBot           = 20.0
-	colGap                = 80.0
+	colGap                = 80.0 // minimum; a gap widens to fit its edge lanes
 	groupGapY             = 40.0
 	maxDiagramInvocations = 256
 	maxDiagramNodes       = 2000
@@ -205,9 +210,10 @@ func generateDiagram(wf diagramWorkflowFile) (*DiagramResponse, error) {
 	}
 	measureDiagramInvocation(root)
 
-	var nodes []DiagramNode
-	var edges []DiagramEdge
-	layoutDiagramInvocation(root, 0, 0, &nodes, &edges)
+	l := &diagramLayout{top: map[string]float64{}, column: map[string]int{}}
+	layoutDiagramInvocation(root, 0, 0, l)
+	assignEdgeLanes(l)
+	nodes, edges := l.nodes, l.edges
 
 	if nodes == nil {
 		nodes = []DiagramNode{}
@@ -292,10 +298,10 @@ func buildDiagramInvocation(
 	}
 	invocation.entryID = invocation.stepIDs[0]
 	last := len(invocation.stepIDs) - 1
+	// The invocation's own last step, even when it calls another workflow: that call returns
+	// into it (see layoutDiagramInvocation), so every call and return edge stays between
+	// adjacent columns (ADR-0006).
 	invocation.exitID = invocation.stepIDs[last]
-	if child := invocation.children[last]; child != nil {
-		invocation.exitID = child.exitID
-	}
 	return invocation, nil
 }
 
@@ -325,7 +331,8 @@ func measureDiagramInvocation(invocation *diagramInvocation) float64 {
 			continue
 		}
 		childHeight := measureDiagramInvocation(child)
-		desired := groupPadTop + float64(i)*(nodeH+nodeGapY)
+		// Align the child's first step with its caller, so the call edge is a straight line.
+		desired := float64(i) * (nodeH + nodeGapY)
 		if cursor > desired {
 			desired = cursor
 		}
@@ -339,12 +346,28 @@ func measureDiagramInvocation(invocation *diagramInvocation) float64 {
 	return height
 }
 
-func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes *[]DiagramNode, edges *[]DiagramEdge) {
+// diagramLayout collects nodes and edges, and where each node sits, so edges can be routed
+// once everything is placed: groups get their x only after the gaps between columns are sized.
+type diagramLayout struct {
+	nodes  []DiagramNode
+	edges  []DiagramEdge
+	groups []groupColumn
+	top    map[string]float64 // absolute y of each step or reference node
+	column map[string]int     // column (call depth) of each step or reference node
+}
+
+type groupColumn struct {
+	node   int
+	column int
+}
+
+func layoutDiagramInvocation(invocation *diagramInvocation, column int, y float64, l *diagramLayout) {
 	groupHeight := invocationGroupHeight(invocation)
-	*nodes = append(*nodes, DiagramNode{
+	l.groups = append(l.groups, groupColumn{node: len(l.nodes), column: column})
+	l.nodes = append(l.nodes, DiagramNode{
 		ID:       invocation.groupID,
 		Type:     "group",
-		Position: DiagramPosition{X: x, Y: y},
+		Position: DiagramPosition{X: 0, Y: y},
 		Data: DiagramNodeData{
 			Label:          invocation.definitionName,
 			Description:    invocation.definition.Description,
@@ -363,7 +386,9 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 			kind = "recursive"
 			label = "Recursive reference"
 		}
-		*nodes = append(*nodes, DiagramNode{
+		l.top[invocation.entryID] = y + groupPadTop
+		l.column[invocation.entryID] = column
+		l.nodes = append(l.nodes, DiagramNode{
 			ID:       invocation.entryID,
 			Type:     "workflowReference",
 			Position: DiagramPosition{X: groupPadX, Y: groupPadTop},
@@ -382,10 +407,13 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 	}
 
 	for i, step := range invocation.definition.Steps {
-		*nodes = append(*nodes, DiagramNode{
+		stepY := groupPadTop + float64(i)*(nodeH+nodeGapY)
+		l.top[invocation.stepIDs[i]] = y + stepY
+		l.column[invocation.stepIDs[i]] = column
+		l.nodes = append(l.nodes, DiagramNode{
 			ID:       invocation.stepIDs[i],
 			Type:     "workflowStep",
-			Position: DiagramPosition{X: groupPadX, Y: groupPadTop + float64(i)*(nodeH+nodeGapY)},
+			Position: DiagramPosition{X: groupPadX, Y: stepY},
 			Data: DiagramNodeData{
 				Label:          step.Name,
 				Description:    step.Description,
@@ -410,23 +438,186 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 	for i := range invocation.definition.Steps {
 		child := invocation.children[i]
 		if child != nil {
-			appendDiagramEdge(edges, "call", invocation.stepIDs[i], child.entryID)
+			appendDiagramEdge(&l.edges, "call", invocation.stepIDs[i], child.entryID)
+			// The child returns to the next step, or, when the call is this workflow's last
+			// step, to the calling step itself (it completes when the child does).
+			returnTo := invocation.stepIDs[i]
 			if i+1 < len(invocation.stepIDs) {
-				appendDiagramEdge(edges, "return", child.exitID, invocation.stepIDs[i+1])
+				returnTo = invocation.stepIDs[i+1]
 			}
+			appendDiagramEdge(&l.edges, "return", child.exitID, returnTo)
 		} else if i+1 < len(invocation.stepIDs) {
-			appendDiagramEdge(edges, "sequence", invocation.stepIDs[i], invocation.stepIDs[i+1])
+			appendDiagramEdge(&l.edges, "sequence", invocation.stepIDs[i], invocation.stepIDs[i+1])
 		}
 	}
 
-	colPitch := nodeW + 2*groupPadX + colGap
 	for i := range invocation.definition.Steps {
 		child := invocation.children[i]
 		if child == nil {
 			continue
 		}
-		layoutDiagramInvocation(child, x+colPitch, y+invocation.childOffsets[i], nodes, edges)
+		layoutDiagramInvocation(child, column+1, y+invocation.childOffsets[i], l)
 	}
+}
+
+// Where call and return edges meet a step card, as a fraction of its height. The UI places the
+// handles at the same heights (SemanticHandles), so a call and a return at one card don't share
+// a point.
+const (
+	callHandleFrac   = 0.35
+	returnHandleFrac = 0.65
+	laneSpacing      = 16.0
+	laneMargin       = 24.0
+)
+
+type laneEdge struct {
+	edge   int
+	gap    int     // the gap between column gap and gap+1
+	lo, hi float64 // vertical extent of the edge's middle segment
+	leftY  float64 // where it meets the left column
+	rightY float64 // where it meets the right column
+	lane   int
+}
+
+// assignEdgeLanes routes every call and return edge through its own lane in the gap it crosses,
+// so no two edges share a vertical segment where their extents overlap, and orders the lanes in
+// each gap to cut crossings. It returns the number of lanes per gap.
+func assignEdgeLanes(l *diagramLayout) map[int]int {
+	byGap := map[int][]*laneEdge{}
+	for i, e := range l.edges {
+		if e.Relation != "call" && e.Relation != "return" {
+			continue
+		}
+		srcCol, tgtCol := l.column[e.Source], l.column[e.Target]
+		frac := callHandleFrac
+		if e.Relation == "return" {
+			frac = returnHandleFrac
+		}
+		srcY := l.top[e.Source] + frac*nodeH
+		tgtY := l.top[e.Target] + frac*nodeH
+		le := &laneEdge{edge: i, lo: math.Min(srcY, tgtY), hi: math.Max(srcY, tgtY)}
+		if srcCol <= tgtCol {
+			le.gap, le.leftY, le.rightY = srcCol, srcY, tgtY
+		} else {
+			le.gap, le.leftY, le.rightY = tgtCol, tgtY, srcY
+		}
+		byGap[le.gap] = append(byGap[le.gap], le)
+	}
+
+	lanes := map[int]int{}
+	for gap, list := range byGap {
+		// Interval partitioning: longest-first keeps long edges on few lanes.
+		sort.SliceStable(list, func(a, b int) bool {
+			if list[a].lo != list[b].lo {
+				return list[a].lo < list[b].lo
+			}
+			return list[a].hi-list[a].lo > list[b].hi-list[b].lo
+		})
+		var laneEnds []float64
+		for _, le := range list {
+			placed := false
+			for k, end := range laneEnds {
+				if le.lo > end+laneSpacing {
+					le.lane, laneEnds[k], placed = k, le.hi, true
+					break
+				}
+			}
+			if !placed {
+				le.lane = len(laneEnds)
+				laneEnds = append(laneEnds, le.hi)
+			}
+		}
+		order := bestLaneOrder(list, len(laneEnds))
+		for _, le := range list {
+			le.lane = order[le.lane]
+		}
+		lanes[gap] = len(laneEnds)
+	}
+
+	widths := map[int]float64{}
+	for gap, n := range lanes {
+		widths[gap] = gapWidth(n)
+	}
+	columnX := func(col int) float64 {
+		x := 0.0
+		for c := 0; c < col; c++ {
+			w, ok := widths[c]
+			if !ok {
+				w = colGap
+			}
+			x += nodeW + 2*groupPadX + w
+		}
+		return x
+	}
+	for _, g := range l.groups {
+		l.nodes[g.node].Position.X = columnX(g.column)
+	}
+	for gap, list := range byGap {
+		start := columnX(gap) + nodeW + 2*groupPadX
+		first := start + (widths[gap]-float64(lanes[gap]-1)*laneSpacing)/2
+		for _, le := range list {
+			e := &l.edges[le.edge]
+			e.Type = "lane"
+			e.Data = map[string]interface{}{"laneX": first + float64(le.lane)*laneSpacing}
+		}
+	}
+	return lanes
+}
+
+func gapWidth(lanes int) float64 {
+	return math.Max(colGap, 2*laneMargin+float64(lanes-1)*laneSpacing)
+}
+
+// bestLaneOrder maps each lane to a position, left to right, with the fewest crossings. A
+// crossing is a horizontal segment passing another edge's vertical one: an edge's right-hand
+// horizontal crosses every lane to its right whose extent contains it, and its left-hand
+// horizontal every lane to its left. Small gaps are searched exhaustively.
+func bestLaneOrder(list []*laneEdge, n int) []int {
+	identity := make([]int, n)
+	for i := range identity {
+		identity[i] = i
+	}
+	if n <= 1 || n > 7 {
+		return identity
+	}
+	crossings := func(pos []int) int {
+		count := 0
+		for _, a := range list {
+			for _, b := range list {
+				if a == b || pos[a.lane] >= pos[b.lane] {
+					continue
+				}
+				// a is left of b.
+				if a.rightY > b.lo && a.rightY < b.hi {
+					count++
+				}
+				if b.leftY > a.lo && b.leftY < a.hi {
+					count++
+				}
+			}
+		}
+		return count
+	}
+	best := append([]int(nil), identity...)
+	bestCount := crossings(best)
+	perm := append([]int(nil), identity...)
+	var permute func(k int)
+	permute = func(k int) {
+		if k == len(perm) {
+			if c := crossings(perm); c < bestCount {
+				bestCount = c
+				copy(best, perm)
+			}
+			return
+		}
+		for i := k; i < len(perm); i++ {
+			perm[k], perm[i] = perm[i], perm[k]
+			permute(k + 1)
+			perm[k], perm[i] = perm[i], perm[k]
+		}
+	}
+	permute(0)
+	return best
 }
 
 func appendDiagramEdge(edges *[]DiagramEdge, relation, source, target string) {

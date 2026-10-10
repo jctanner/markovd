@@ -16,6 +16,7 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Run graph follow-mode decision](decisions/ADR-0003-follow-running-workflow-step.md)
 - [Standalone Markov workflow classification decision](decisions/ADR-0004-classify-standalone-markov-workflows.md)
 - [Call-site-expanded workflow diagram decision](decisions/ADR-0005-expand-definition-diagrams-by-call-site.md)
+- [Adjacent-column returns and edge lanes decision](decisions/ADR-0006-adjacent-column-returns-and-edge-lanes.md)
 
 ## Milestones
 
@@ -31,6 +32,7 @@ None.
 
 ## Done Tasks
 
+- [Definition graph layout: adjacent returns, edge lanes, alignment, spacing](tasks/done/definition-graph-layout-lanes.md)
 - [Show workflow and step descriptions in the definition graph](tasks/done/definition-graph-details-panel.md)
 - [Keep runs on a data volume, resume runs, show step descriptions](tasks/done/run-data-volume-and-resume.md)
 - [Keep all files on project import and record the source commit](tasks/done/project-import-all-files-and-source-commit.md)

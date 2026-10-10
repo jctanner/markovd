@@ -10,8 +10,10 @@ import {
   Position,
   MarkerType,
   useReactFlow,
+  BaseEdge,
+  getSmoothStepPath,
 } from '@xyflow/react';
-import type { Node, Edge, NodeProps } from '@xyflow/react';
+import type { Node, Edge, NodeProps, EdgeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { DiagramNode, DiagramEdge } from '../api';
 import {
@@ -115,15 +117,35 @@ type StructureNodeData = {
   referenceKind?: string;
 };
 
+// Must match callHandleFrac and returnHandleFrac in markovd's diagram.go.
+const CALL_HANDLE_TOP = '35%';
+const RETURN_HANDLE_TOP = '65%';
+
+// A call or return edge routed through the lane the server assigned in its gap (data.laneX), so
+// edges crossing the same gap never share a vertical segment.
+function LaneEdge({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, style, markerEnd, data }: EdgeProps) {
+  const laneX = typeof data?.laneX === 'number' ? data.laneX : undefined;
+  const [path] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
+    borderRadius: 8,
+    centerX: laneX,
+  });
+  return <BaseEdge path={path} style={style} markerEnd={markerEnd} />;
+}
+
+const edgeTypes = { lane: LaneEdge };
+
 function SemanticHandles() {
   return (
     <>
       <Handle id="sequence-target" type="target" position={Position.Top} className="graph-handle" />
       <Handle id="sequence-source" type="source" position={Position.Bottom} className="graph-handle" />
-      <Handle id="call-source" type="source" position={Position.Right} className="graph-handle-semantic" />
-      <Handle id="return-target" type="target" position={Position.Right} className="graph-handle-semantic" />
-      <Handle id="call-target" type="target" position={Position.Left} className="graph-handle-semantic" />
-      <Handle id="return-source" type="source" position={Position.Left} className="graph-handle-semantic" />
+      {/* Calls meet a card higher up than returns, so a step that is both a caller and a return
+          target doesn't merge the two lines (the server routes with the same fractions). */}
+      <Handle id="call-source" type="source" position={Position.Right} className="graph-handle-semantic" style={{ top: CALL_HANDLE_TOP }} />
+      <Handle id="return-target" type="target" position={Position.Right} className="graph-handle-semantic" style={{ top: RETURN_HANDLE_TOP }} />
+      <Handle id="call-target" type="target" position={Position.Left} className="graph-handle-semantic" style={{ top: CALL_HANDLE_TOP }} />
+      <Handle id="return-source" type="source" position={Position.Left} className="graph-handle-semantic" style={{ top: RETURN_HANDLE_TOP }} />
     </>
   );
 }
@@ -347,6 +369,7 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
       sourceHandle: e.sourceHandle || `${relation}-source`,
       targetHandle: e.targetHandle || `${relation}-target`,
       type: e.type || 'smoothstep',
+      data: e.data,
       animated: e.animated || false,
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -480,6 +503,7 @@ export default function WorkflowStructureGraph({ nodes: rawNodes, edges: rawEdge
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onInit={onInit}
         fitView
         fitViewOptions={{ padding: 0.3 }}
