@@ -116,7 +116,7 @@ func (d *DB) ListActiveJobs(ctx context.Context) ([]models.ActiveJob, error) {
 		`SELECT kind, run_id, fork_id, workflow_name, step_name, step_type, status, job_name, started_at
 		FROM (
 			SELECT 'run' AS kind, run_id, '' AS fork_id, workflow_name,
-			       '' AS step_name, '' AS step_type, status, run_id AS job_name, started_at
+			       '' AS step_name, '' AS step_type, status, COALESCE(NULLIF(job_name, ''), run_id) AS job_name, started_at
 			FROM runs WHERE status IN ('running', 'pending')
 			UNION ALL
 			SELECT 'step' AS kind, run_id, COALESCE(fork_id, ''), workflow_name,
@@ -229,6 +229,22 @@ func (d *DB) GetDurationHistory(ctx context.Context) ([]models.DurationBucket, e
 		buckets = append(buckets, b)
 	}
 	return buckets, rows.Err()
+}
+
+// MarkRunResumed records that a run was resumed in a new Job: running again, not completed, and
+// tracked by that Job's name.
+func (d *DB) MarkRunResumed(ctx context.Context, runID, jobName string) error {
+	_, err := d.ExecContext(ctx,
+		`UPDATE runs SET status = 'running', completed_at = NULL, job_name = $2 WHERE run_id = $1`,
+		runID, jobName)
+	return err
+}
+
+// MarkRunPaused records a paused run: not running and not finished.
+func (d *DB) MarkRunPaused(ctx context.Context, runID string) error {
+	_, err := d.ExecContext(ctx,
+		`UPDATE runs SET status = 'paused', completed_at = NULL WHERE run_id = $1`, runID)
+	return err
 }
 
 func (d *DB) UpsertRunFromEvent(ctx context.Context, runID, workflowName, status string, startedAt, completedAt *time.Time) error {

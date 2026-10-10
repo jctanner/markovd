@@ -2816,3 +2816,9 @@ td.cell-link a:hover {
   color: var(--status-failed);
   font-weight: 600;
 }
+
+.step-detail-description {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  color: var(--text-secondary, inherit);
+}

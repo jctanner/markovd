@@ -23,6 +23,7 @@ bugs, decisions, and operational notes live under `docs/`.
 
 ## Active Tasks
 
+- [Keep runs on a data volume, resume runs, show step descriptions](tasks/current/run-data-volume-and-resume.md)
 - [Keep all files on project import and record the source commit](tasks/current/project-import-all-files-and-source-commit.md)
 
 ## Pending Tasks

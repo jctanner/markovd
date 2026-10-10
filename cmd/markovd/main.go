@@ -34,6 +34,9 @@ func main() {
 	jobVolumes := envOr("MARKOVD_JOB_VOLUMES", "")
 	jobSecretMounts := envOr("MARKOVD_JOB_SECRET_MOUNTS", "")
 	projectsDir := envOr("MARKOVD_PROJECTS_DIR", "./data/projects")
+	// A PVC for run files and state (kubernetes runner), mounted in markovd at MARKOVD_DATA_DIR.
+	dataPVC := envOr("MARKOVD_DATA_PVC", "")
+	dataDir := envOr("MARKOVD_DATA_DIR", "/data")
 
 	if jwtSecret == "" {
 		jwtSecret = generateSecret()
@@ -72,11 +75,17 @@ func main() {
 				log.Fatalf("MARKOVD_JOB_NAMESPACE is required (not running in a pod)")
 			}
 		}
-		var err error
-		r, err = runner.NewKubernetesRunner(markovImage, jobImagePullPolicy, jobNamespace, jobSA, runner.ParseSecrets(jobSecrets), runner.ParseVolumes(jobVolumes), runner.ParseSecretMounts(jobSecretMounts))
+		k8sRunner, err := runner.NewKubernetesRunner(markovImage, jobImagePullPolicy, jobNamespace, jobSA, runner.ParseSecrets(jobSecrets), runner.ParseVolumes(jobVolumes), runner.ParseSecretMounts(jobSecretMounts))
 		if err != nil {
 			log.Fatalf("Failed to create kubernetes runner: %v", err)
 		}
+		if dataPVC != "" {
+			k8sRunner.SetDataVolume(dataPVC, dataDir)
+			log.Printf("Runs keep their files and state on PVC %s (mounted at %s)", dataPVC, dataDir)
+		} else {
+			log.Printf("No MARKOVD_DATA_PVC: workflows go into ConfigMaps (about 1 MiB) and runs can't be resumed")
+		}
+		r = k8sRunner
 		log.Printf("Using kubernetes runner (image=%s, namespace=%s, sa=%s)", markovImage, jobNamespace, jobSA)
 	default:
 		log.Fatalf("Unknown MARKOVD_RUNNER value: %q (expected 'shell' or 'kubernetes')", runnerType)

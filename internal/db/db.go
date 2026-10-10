@@ -154,6 +154,9 @@ func (d *DB) migrate() error {
 			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='runs' AND column_name='workflow_source_commit') THEN
 				ALTER TABLE runs ADD COLUMN workflow_source_commit TEXT NOT NULL DEFAULT '';
 			END IF;
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='runs' AND column_name='job_name') THEN
+				ALTER TABLE runs ADD COLUMN job_name TEXT NOT NULL DEFAULT '';
+			END IF;
 		END $$`,
 	}
 	for _, m := range migrations {

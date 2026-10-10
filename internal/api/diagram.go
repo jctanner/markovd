@@ -21,12 +21,13 @@ type diagramWorkflow struct {
 }
 
 type diagramStep struct {
-	Name     string   `yaml:"name"`
-	Type     string   `yaml:"type"`
-	ForEach  string   `yaml:"for_each"`
-	Workflow string   `yaml:"workflow"`
-	When     string   `yaml:"when"`
-	Rules    []string `yaml:"rules"`
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Type        string   `yaml:"type"`
+	ForEach     string   `yaml:"for_each"`
+	Workflow    string   `yaml:"workflow"`
+	When        string   `yaml:"when"`
+	Rules       []string `yaml:"rules"`
 }
 
 type DiagramPosition struct {
@@ -36,6 +37,7 @@ type DiagramPosition struct {
 
 type DiagramNodeData struct {
 	Label          string   `json:"label"`
+	Description    string   `json:"description,omitempty"`
 	StepType       string   `json:"stepType"`
 	Category       string   `json:"category"`
 	ForEach        string   `json:"forEach,omitempty"`
@@ -375,6 +377,7 @@ func layoutDiagramInvocation(invocation *diagramInvocation, x, y float64, nodes 
 			Position: DiagramPosition{X: groupPadX, Y: groupPadTop + float64(i)*(nodeH+nodeGapY)},
 			Data: DiagramNodeData{
 				Label:          step.Name,
+				Description:    step.Description,
 				StepType:       step.Type,
 				Category:       stepCategory(step),
 				ForEach:        step.ForEach,

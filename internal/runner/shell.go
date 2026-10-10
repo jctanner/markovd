@@ -92,6 +92,15 @@ func (r *ShellRunner) Cancel(runID string) error {
 	return proc.Kill()
 }
 
+// Resume isn't supported: the shell runner removes a run's files when it ends.
+func (r *ShellRunner) Resume(ctx context.Context, req ResumeRequest) (string, error) {
+	return "", ErrResumeUnsupported
+}
+
+func (r *ShellRunner) Delete(runID string) error {
+	return r.Cancel(runID)
+}
+
 func (r *ShellRunner) ListPVCs(ctx context.Context) ([]PVCInfo, error) {
 	return nil, nil
 }

@@ -64,6 +64,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/runs/{runID}", s.handleGetRun)
 			r.Post("/runs", s.handleCreateRun)
 			r.Post("/runs/{runID}/cancel", s.handleCancelRun)
+			r.Post("/runs/{runID}/resume", s.handleResumeRun)
 			r.Delete("/runs/{runID}", s.handleDeleteRun)
 			r.Get("/runs/{runID}/progress", s.handleStepProgress)
 			r.Get("/runs/{runID}/logs", s.handleGetRunLogs)

@@ -117,6 +117,13 @@ func (s *Server) processEvent(r *http.Request, runID, eventType string, payload 
 	case "run_failed":
 		_ = s.db.UpsertRunFromEvent(ctx, root, getString("workflow_name"), "failed", nil, ts)
 
+	case "run_paused":
+		// A gate paused the run; it waits for a resume with new vars.
+		_ = s.db.MarkRunPaused(ctx, root)
+
+	case "run_resumed":
+		_ = s.db.UpsertRunFromEvent(ctx, root, getString("workflow_name"), "running", nil, nil)
+
 	case "step_progress":
 		// Live in-step progress (for example claude transcript events). It is
 		// kept only in the events table and read through the progress endpoint.

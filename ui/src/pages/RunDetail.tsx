@@ -7,6 +7,7 @@ import WorkflowGraph from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
 import RerunModal from '../components/RerunModal';
+import ResumeModal from '../components/ResumeModal';
 import RunLogs from '../components/RunLogs';
 import WorkflowStructureGraph from '../components/WorkflowStructureGraph';
 import type { DiagramResponse } from '../api';
@@ -18,12 +19,13 @@ function badgeClass(status: string): string {
     completed: 'badge-completed',
     failed: 'badge-failed',
     cancelled: 'badge-failed',
+    paused: 'badge-skipped',
   };
   return `badge ${map[status] || 'badge-pending'}`;
 }
 
 function pollInterval(stepCount: number, status: string): number {
-  if (status === 'completed' || status === 'failed' || status === 'cancelled') return 30000;
+  if (status === 'completed' || status === 'failed' || status === 'cancelled' || status === 'paused') return 30000;
   if (stepCount > 5000) return 30000;
   if (stepCount > 1000) return 15000;
   if (stepCount > 500) return 10000;
@@ -58,6 +60,7 @@ export default function RunDetail() {
   const viewInitialized = useRef(false);
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [showRerun, setShowRerun] = useState(false);
+  const [showResume, setShowResume] = useState(false);
   const [diagram, setDiagram] = useState<DiagramResponse | null>(null);
   const [diagramOpen, setDiagramOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +173,29 @@ export default function RunDetail() {
     }
   };
 
+  const handleResumeConfirm = async (vars: Record<string, string>) => {
+    if (!runID) return;
+    try {
+      await api.resumeRun(runID, vars);
+      setShowResume(false);
+      await loadRun();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resume run');
+    }
+  };
+
+  // Step descriptions from the workflow definition, by workflow and step name. A for_each item
+  // (`name[key]`) or a lifecycle step (`rescue/name`) uses its step's description.
+  const descriptions = new Map<string, string>();
+  for (const node of diagram?.nodes ?? []) {
+    if (node.data.description) descriptions.set(`${node.data.workflowGroup}/${node.data.label}`, node.data.description);
+  }
+  const stepDescription = (step: Step | null) => {
+    if (!step) return undefined;
+    const base = step.step_name.replace(/^(rescue|always)\//, '').replace(/\[.*\]$/, '');
+    return descriptions.get(`${step.workflow_name}/${base}`);
+  };
+
   const handleRerunConfirm = async (
     vars: Record<string, string>,
     volumes: { name: string; pvc: string; mount_path: string }[],
@@ -217,6 +243,9 @@ export default function RunDetail() {
         <div>
           {(run.status === 'running' || run.status === 'pending') && (
             <button className="btn btn-danger btn-sm" onClick={handleCancel}>Stop</button>
+          )}
+          {(run.status === 'paused' || run.status === 'failed') && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowResume(true)}>Resume</button>
           )}
           {' '}
           <button className="btn btn-ghost btn-sm" onClick={handleDelete}>Delete</button>
@@ -337,7 +366,12 @@ export default function RunDetail() {
       {view === 'gantt' && <GanttChart steps={run.steps} onStepClick={handleStepClick} />}
       {view === 'table' && <StepTable steps={run.steps} onStepClick={handleStepClick} />}
 
-      <StepDetailModal step={selectedStep} onClose={() => setSelectedStep(null)} />
+      <StepDetailModal step={selectedStep} description={stepDescription(selectedStep)} onClose={() => setSelectedStep(null)} />
+      <ResumeModal
+        run={showResume ? run : null}
+        onClose={() => setShowResume(false)}
+        onConfirm={handleResumeConfirm}
+      />
       <RerunModal
         run={showRerun ? run : null}
         onClose={() => setShowRerun(false)}

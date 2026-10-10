@@ -97,6 +97,7 @@ function iconSvg(name: string) {
 
 type StructureNodeData = {
   label: string;
+  description?: string;
   stepType: string;
   category: string;
   forEach?: string;
@@ -134,6 +135,7 @@ function StructureStepNode({ data }: NodeProps<Node<StructureNodeData>>) {
     <div
       className={`graph-node struct-node struct-node-${data.category}`}
       style={{ borderLeftColor: border }}
+      title={data.description || undefined}
     >
       <SemanticHandles />
       <div className="graph-node-top">

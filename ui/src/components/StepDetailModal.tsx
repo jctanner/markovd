@@ -5,6 +5,8 @@ import { describeToolInput, isTerminalKind, mergeProgress, summarizeProgress } f
 
 interface Props {
   step: Step | null;
+  // The step's description from the workflow definition, when it has one.
+  description?: string;
   onClose: () => void;
 }
 
@@ -293,7 +295,7 @@ function TranscriptSection({ step }: { step: Step }) {
   );
 }
 
-export default function StepDetailModal({ step, onClose }: Props) {
+export default function StepDetailModal({ step, description, onClose }: Props) {
   if (!step) return null;
 
   const output = parseOutputJson(step.output_json);
@@ -317,6 +319,7 @@ export default function StepDetailModal({ step, onClose }: Props) {
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
+          {description && <p className="step-detail-description">{description}</p>}
           <div className="step-detail-meta">
             <div className="step-detail-field">
               <div className="step-detail-label">Workflow</div>

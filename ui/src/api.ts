@@ -164,6 +164,7 @@ export interface DurationBucket {
 export interface DiagramNodeData {
   [key: string]: unknown;
   label: string;
+  description?: string;
   stepType: string;
   category: string;
   forEach?: string;
@@ -322,6 +323,13 @@ export const api = {
 
   getWorkflowDiagram(name: string) {
     return request<DiagramResponse>(`/workflows/${name}/diagram`);
+  },
+
+  resumeRun(runID: string, vars: Record<string, string>) {
+    return request<Run>(`/runs/${runID}/resume`, {
+      method: 'POST',
+      body: JSON.stringify({ vars }),
+    });
   },
 
   cancelRun(runID: string) {

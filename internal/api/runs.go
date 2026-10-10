@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -151,6 +152,69 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, run)
+}
+
+type resumeRunRequest struct {
+	Vars map[string]string `json:"vars"`
+}
+
+// handleResumeRun resumes a paused or failed run from its saved state. A run paused at a gate
+// needs at least one var, which the gate evaluates again.
+func (s *Server) handleResumeRun(w http.ResponseWriter, r *http.Request) {
+	runID := chi.URLParam(r, "runID")
+	var req resumeRunRequest
+	if r.ContentLength != 0 {
+		if err := readJSON(r, &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+			return
+		}
+	}
+
+	run, err := s.db.GetRunByID(r.Context(), runID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get run"})
+		return
+	}
+	if run == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "run not found"})
+		return
+	}
+	if run.Status != "paused" && run.Status != "failed" {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": fmt.Sprintf("only paused or failed runs can be resumed; this one is %q", run.Status)})
+		return
+	}
+	if run.Status == "paused" && len(req.Vars) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "a paused run needs at least one var to resume (the gate is evaluated again with it)"})
+		return
+	}
+
+	var volumes []runner.PVCMount
+	_ = json.Unmarshal([]byte(run.VolumesJSON), &volumes)
+	var secretVolumes []runner.SecretMount
+	_ = json.Unmarshal([]byte(run.SecretVolumesJSON), &secretVolumes)
+
+	jobName, err := s.runner.Resume(r.Context(), runner.ResumeRequest{
+		RunID:         runID,
+		Vars:          req.Vars,
+		CallbackURL:   s.callbackURL,
+		CallbackToken: s.callbackToken,
+		Volumes:       volumes,
+		SecretVolumes: secretVolumes,
+	})
+	if errors.Is(err, runner.ErrResumeUnsupported) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to resume run: %v", err)})
+		return
+	}
+	if err := s.db.MarkRunResumed(r.Context(), runID, jobName); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to record resume"})
+		return
+	}
+	run, _ = s.db.GetRunByID(r.Context(), runID)
+	writeJSON(w, http.StatusOK, run)
 }
 
 func (s *Server) handleCancelRun(w http.ResponseWriter, r *http.Request) {
@@ -473,7 +537,7 @@ func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.runner.Cancel(runID); err != nil {
+	if err := s.runner.Delete(runID); err != nil {
 		log.Printf("Warning: cleanup K8s resources for %s: %v", runID, err)
 	}
 

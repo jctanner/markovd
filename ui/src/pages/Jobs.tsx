@@ -10,6 +10,7 @@ function badgeClass(status: string): string {
     completed: 'badge-completed',
     failed: 'badge-failed',
     cancelled: 'badge-failed',
+    paused: 'badge-skipped',
   };
   return `badge ${map[status] || 'badge-pending'}`;
 }

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 
@@ -42,6 +43,20 @@ func (r RunRequest) WorkflowDefinition() models.WorkflowDefinition {
 	return workflowdef.FromLegacyYAML(r.WorkflowYAML)
 }
 
+// ResumeRequest resumes a paused or failed run with optional var overrides (a paused gate
+// needs at least one).
+type ResumeRequest struct {
+	RunID         string
+	Vars          map[string]string
+	CallbackURL   string
+	CallbackToken string
+	Volumes       []PVCMount
+	SecretVolumes []SecretMount
+}
+
+// ErrResumeUnsupported means the runner keeps no state to resume from.
+var ErrResumeUnsupported = errors.New("resume needs runs kept on a data volume (kubernetes runner with MARKOVD_DATA_PVC)")
+
 type PVCInfo struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
@@ -54,7 +69,10 @@ type SecretInfo struct {
 
 type Runner interface {
 	Start(ctx context.Context, req RunRequest) (runID string, err error)
+	Resume(ctx context.Context, req ResumeRequest) (jobName string, err error)
 	Cancel(runID string) error
+	// Delete cancels a run and removes anything kept for it.
+	Delete(runID string) error
 	ListPVCs(ctx context.Context) ([]PVCInfo, error)
 	ListSecrets(ctx context.Context) ([]SecretInfo, error)
 	GetJobLogs(ctx context.Context, jobName string) (string, error)
