@@ -1892,6 +1892,33 @@ td.cell-link a:hover {
   border-top-style: dotted;
 }
 
+.run-graph-line-branch {
+  border-top-color: var(--accent);
+  border-top-style: dashed;
+}
+
+.run-graph-status-legend {
+  margin-top: 6px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.run-graph-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.run-graph-open {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.graph-container .react-flow__node.run-node-selected .graph-node {
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--accent);
+}
+
 .struct-graph-selection {
   display: flex;
   align-items: center;

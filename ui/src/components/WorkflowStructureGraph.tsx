@@ -275,7 +275,7 @@ function JumpToBottomButton({ nodes }: { nodes: Node[] }) {
 
 // The details panel for a selected step or workflow: its description in full and the settings
 // that decide when and how it runs. Cards stay compact; long-form text lives here.
-function NodeDetails({ data, path }: { data: DiagramNode['data']; path: string }) {
+export function NodeDetails({ data, path }: { data: DiagramNode['data']; path: string }) {
   const isGroup = data.category === 'group';
   const rows: Array<[string, string]> = [];
   if (!isGroup) {

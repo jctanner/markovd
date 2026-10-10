@@ -14,6 +14,8 @@ import type { Node, Edge, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Step } from '../api';
 import { childPath as chainChildPath, findForEachForks as forEachForks, measureExtents, placeForks } from './runGraphLayout';
+import type { DiagramNode } from '../api';
+import { NodeDetails } from './WorkflowStructureGraph';
 import { resolveFollowTarget } from './workflowGraphFollow';
 
 const NODE_H = 72;
@@ -853,9 +855,86 @@ function useColorMode(): 'dark' | 'light' {
 interface Props {
   steps: Step[];
   onStepClick?: (step: Step) => void;
+  // The workflow definition's step data (description, when, for_each, ...), keyed by
+  // `${workflow}/${step}`, for the details panel.
+  definitions?: Map<string, DiagramNode['data']>;
 }
 
-export default function WorkflowGraph({ steps, onStepClick }: Props) {
+// The definition key for a run step: a for_each item (`name[key]`) or a lifecycle step
+// (`rescue/name`) uses its step's definition.
+export function definitionKey(step: Step): string {
+  const base = step.step_name.replace(/^(rescue|always)\//, '').replace(/\[.*\]$/, '');
+  return `${step.workflow_name}/${base}`;
+}
+
+const runLegend: Array<[string, string]> = [
+  ['sequence', 'Sequence'],
+  ['branch', 'Into a sub-workflow or for_each branch, and back'],
+];
+
+const legendStatuses = ['completed', 'running', 'failed', 'skipped', 'pending'];
+
+// The legend and, when a step is selected, its details: what happened in this run, then what the
+// definition says the step does. Long output and logs stay in the step dialog.
+function RunGraphKey({ step, definition, onOpen, onClear }: {
+  step: Step | undefined;
+  definition: DiagramNode['data'] | undefined;
+  onOpen: () => void;
+  onClear: () => void;
+}) {
+  const jobName = step ? parseJobName(step.output_json || '') : null;
+  return (
+    <aside className="struct-graph-key" aria-label="Run graph legend">
+      <div className="struct-graph-legend">
+        {runLegend.map(([kind, label]) => (
+          <span className="struct-graph-legend-item" key={kind}>
+            <span className={`struct-graph-line run-graph-line-${kind}`} aria-hidden="true" />
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="struct-graph-legend run-graph-status-legend">
+        {legendStatuses.map(status => (
+          <span className="struct-graph-legend-item" key={status}>
+            <span className="run-graph-status-dot" style={{ background: statusBorder[status] }} aria-hidden="true" />
+            {status}
+          </span>
+        ))}
+      </div>
+      {step && (
+        <div className="struct-graph-selection" role="status" aria-live="polite">
+          <div className="struct-graph-selection-copy">
+            {definition ? (
+              <NodeDetails data={definition} path={step.fork_id || step.workflow_name} />
+            ) : (
+              <>
+                <div className="struct-details-head">
+                  <strong>{step.step_name}</strong>
+                  <span className="struct-details-kind">{step.step_type || 'step'}</span>
+                </div>
+                <span>{step.fork_id || step.workflow_name}</span>
+              </>
+            )}
+            <dl className="struct-details-fields">
+              <div><dt>status</dt><dd>{step.status}</dd></div>
+              <div><dt>duration</dt><dd>{duration(step.started_at, step.completed_at) || '-'}</dd></div>
+              {jobName && <div><dt>job</dt><dd>{jobName}</dd></div>}
+              {step.error && <div><dt>{step.status === 'skipped' ? 'reason' : 'error'}</dt><dd>{step.error.length > 240 ? step.error.slice(0, 240) + '…' : step.error}</dd></div>}
+            </dl>
+            <button type="button" className="btn btn-ghost btn-sm run-graph-open" onClick={onOpen}>
+              {jobName ? 'Details & live log' : 'Details'}
+            </button>
+          </div>
+          <button type="button" className="struct-graph-clear" onClick={onClear} title="Clear selection" aria-label="Clear selection">
+            {iconSvg('x')}
+          </button>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+export default function WorkflowGraph({ steps, onStepClick, definitions }: Props) {
   const { nodes, edges, stepMap, collapsedForks, followNodeByStepId } = useMemo(() => buildGraph(steps), [steps]);
   const followTargetId = useMemo(
     () => resolveFollowTarget(steps, followNodeByStepId),
@@ -864,6 +943,12 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
   const colorMode = useColorMode();
   const [fullscreen, setFullscreen] = useState(false);
   const [activeFork, setActiveFork] = useState<CollapsedForkMeta | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedStep = selectedId ? stepMap.get(selectedId) : undefined;
+  const shownNodes = useMemo(
+    () => selectedId ? nodes.map(n => n.id === selectedId ? { ...n, className: `${n.className || ''} run-node-selected`.trim() } : n) : nodes,
+    [nodes, selectedId],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.position.y), 0);
@@ -885,10 +970,10 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
       if (meta) setActiveFork(meta);
       return;
     }
-    if (!onStepClick) return;
-    const step = stepMap.get(node.id);
-    if (step) onStepClick(step);
-  }, [onStepClick, stepMap, collapsedForks]);
+    // A click selects the step and shows its details in the legend panel; the panel opens the
+    // step dialog (output, live log).
+    if (stepMap.has(node.id)) setSelectedId(node.id);
+  }, [stepMap, collapsedForks]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -916,12 +1001,19 @@ export default function WorkflowGraph({ steps, onStepClick }: Props) {
         >
           {iconSvg(fullscreen ? 'shrink' : 'expand')}
         </button>
+        <RunGraphKey
+          step={selectedStep}
+          definition={selectedStep && definitions ? definitions.get(definitionKey(selectedStep)) : undefined}
+          onOpen={() => { if (selectedStep && onStepClick) onStepClick(selectedStep); }}
+          onClear={() => setSelectedId(null)}
+        />
         <ReactFlow
-          nodes={nodes}
+          nodes={shownNodes}
           edges={edges}
           nodeTypes={nodeTypes}
           onInit={onInit}
           onNodeClick={handleNodeClick}
+          onPaneClick={() => setSelectedId(null)}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           nodesDraggable={false}

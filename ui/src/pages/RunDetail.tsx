@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import type { DiagramNode } from '../api';
 import type { RunDetail as RunDetailType, Step } from '../api';
 import StepTable from '../components/StepTable';
-import WorkflowGraph from '../components/WorkflowGraph';
+import WorkflowGraph, { definitionKey } from '../components/WorkflowGraph';
 import GanttChart from '../components/GanttChart';
 import StepDetailModal from '../components/StepDetailModal';
 import RerunModal from '../components/RerunModal';
@@ -192,11 +193,12 @@ export default function RunDetail() {
   for (const node of diagram?.nodes ?? []) {
     if (node.data.description) descriptions.set(`${node.data.workflowGroup}/${node.data.label}`, node.data.description);
   }
-  const stepDescription = (step: Step | null) => {
-    if (!step) return undefined;
-    const base = step.step_name.replace(/^(rescue|always)\//, '').replace(/\[.*\]$/, '');
-    return descriptions.get(`${step.workflow_name}/${base}`);
-  };
+  const stepDescription = (step: Step | null) => (step ? descriptions.get(definitionKey(step)) : undefined);
+  // Every step's definition data, for the graph's details panel.
+  const stepDefinitions = new Map<string, DiagramNode['data']>();
+  for (const node of diagram?.nodes ?? []) {
+    if (node.data.category !== 'group') stepDefinitions.set(`${node.data.workflowGroup}/${node.data.label}`, node.data);
+  }
 
   const handleRerunConfirm = async (
     vars: Record<string, string>,
@@ -364,7 +366,7 @@ export default function RunDetail() {
       </div>
 
       {view === 'logs' && <RunLogs runID={run.run_id} status={run.status} />}
-      {view === 'graph' && <WorkflowGraph steps={run.steps} onStepClick={handleStepClick} />}
+      {view === 'graph' && <WorkflowGraph steps={run.steps} onStepClick={handleStepClick} definitions={stepDefinitions} />}
       {view === 'gantt' && <GanttChart steps={run.steps} onStepClick={handleStepClick} />}
       {view === 'table' && <StepTable steps={run.steps} onStepClick={handleStepClick} />}
 
