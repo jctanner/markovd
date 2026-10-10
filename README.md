@@ -20,7 +20,13 @@ markovd provides an HTTP API and React UI on top of markov, letting users trigge
 
 ## Features
 
-- **Run management** — trigger, list, and inspect workflow runs
+- **Run management** — trigger, list, inspect, cancel and delete workflow runs
+- **Resume** — resume a paused or failed run from its saved state, with var
+  overrides (a gate is evaluated again with them)
+- **Run data volume** — each run's workflow files and Markov state live on a
+  PVC (`MARKOVD_DATA_PVC`), so runs have no ConfigMap size cap and can resume
+- **Step descriptions** — Markov's `description` field shows on the workflow
+  graph and in the step detail dialog
 - **Workflow input formats** — upload or import either single-file workflows or Markov directory workflow projects
 - **Callback event receiver** — ingests real-time step lifecycle events from markov's HTTP callback system
 - **Sub-workflow visibility** — full execution tree for fan-out (`for_each`), recursive, and nested sub-workflows
@@ -95,7 +101,10 @@ All under `/api/v1/`, JWT-protected except login/register and the event receiver
 | POST   | `/auth/register`       | Register new user              |
 | GET    | `/runs`                | List runs                      |
 | GET    | `/runs/:id`            | Run detail with all steps      |
-| POST   | `/runs`                | Trigger a new run              |
+| POST   | `/runs`                | Trigger a new run (git-imported workflows get the `workflow_source_commit` var) |
+| POST   | `/runs/:id/cancel`     | Cancel a running run           |
+| POST   | `/runs/:id/resume`     | Resume a paused or failed run: `{"vars": {...}}`; a paused run needs at least one var |
+| DELETE | `/runs/:id`            | Delete a run, its Jobs and its data |
 | GET    | `/workflows`           | List workflows                 |
 | GET    | `/workflows/:name`     | Get workflow by name           |
 | POST   | `/workflows`           | Upload a workflow file or directory definition |
@@ -114,6 +123,9 @@ Environment variables (with defaults):
 | `MARKOVD_MARKOV_BIN`    | `markov`                         | Path to markov binary               |
 | `MARKOVD_CALLBACK_TOKEN`| *(empty)*                        | Shared token for callback auth      |
 | `MARKOVD_CALLBACK_URL`  | `http://localhost:PORT/api/v1/events` | URL markov posts callbacks to |
+| `MARKOVD_DATA_PVC`      | *(empty)*                        | PVC for run files and state (kubernetes runner). Without it, workflows go into ConfigMaps (about 1 MiB) and runs can't be resumed |
+| `MARKOVD_DATA_DIR`      | `/data`                          | Where markovd has `MARKOVD_DATA_PVC` mounted; runs live in `runs/<run-id>/` |
+| `MARKOVD_PROJECTS_DIR`  | `./data/projects`                | Git project clones; put it on the data volume so clones survive restarts |
 
 Workflow uploads support the legacy `{ "name": "...", "yaml": "..." }` payload
 for single-file workflows and `{ "name": "...", "definition_kind": "directory",

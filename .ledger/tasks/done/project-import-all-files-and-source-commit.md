@@ -2,7 +2,7 @@
 
 ## Status
 
-Current
+Done (2026-10-10)
 
 ## Summary
 
@@ -58,5 +58,7 @@ planning Breadboard's strat-workflow benchmark
   `var-benchmarks-strat-workflow` has `source_commit` `921cce9…` (Breadboard
   HEAD) and all 30 files, including `scripts/*.py`, `scripts/*.sh`, `data/`
   and `README.md`.
-- Still to see: a run started from markovd carrying `workflow_source_commit`
-  in its vars (the first benchmark run will show it).
+
+- 2026-10-10: a run started from markovd carried
+  `{"workflow_source_commit": "45eec72…"}` in `vars_json`, and the workflow
+  asserted it was 40 characters.

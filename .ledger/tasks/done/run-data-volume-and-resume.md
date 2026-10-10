@@ -2,7 +2,7 @@
 
 ## Status
 
-Current: built and unit-tested; deployment and an end-to-end check follow.
+Done (2026-10-10)
 
 ## Summary
 
@@ -67,3 +67,27 @@ Gaps found while running Breadboard's strat-workflow benchmark from markovd:
   - an escaping file path is rejected.
 - Existing cancel tests still pass: Cancel now lists the run's Jobs and
   deletes each, and still errors when there is none.
+
+## End-to-end check (2026-10-10)
+
+Deployed with Breadboard's `deploy/k8s/15-markovd.yaml` (`markovd-data`
+PVC). Breadboard's `var/demos/markov-feature-check` was run through the API
+(no model calls), with three attempts:
+
+1. **Start:** failed at the fan-out as designed. Item `b` failed, and `c`
+   did not start. The run directory held the workflow and
+   `markov-state.db`; no ConfigMap was created.
+2. **Resume with `allow_b=true`:** only `b` ran. The collect step saw all
+   three results, and the run went to **paused** at the gate. Resuming
+   with no vars was refused with 400.
+3. **Resume with `approved=true`:** completed.
+
+Found and fixed along the way:
+
+- `markov resume` didn't accept `--verbose` (Markov `3520707`);
+- resumed numbers printed as `2.000000` (Markov `88190a4`);
+- stale step errors were kept after a re-run (`3186ce0`).
+
+The reconcile followed the resume Job (`runs.job_name`). Importing right
+after a markovd restart, with no new sync, worked, because the clones are
+now on the volume.

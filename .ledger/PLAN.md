@@ -23,8 +23,6 @@ bugs, decisions, and operational notes live under `docs/`.
 
 ## Active Tasks
 
-- [Keep runs on a data volume, resume runs, show step descriptions](tasks/current/run-data-volume-and-resume.md)
-- [Keep all files on project import and record the source commit](tasks/current/project-import-all-files-and-source-commit.md)
 
 ## Pending Tasks
 
@@ -32,6 +30,8 @@ None.
 
 ## Done Tasks
 
+- [Keep runs on a data volume, resume runs, show step descriptions](tasks/done/run-data-volume-and-resume.md)
+- [Keep all files on project import and record the source commit](tasks/done/project-import-all-files-and-source-commit.md)
 - [Improve workflow definition edge readability](tasks/done/improve-workflow-definition-edge-readability.md)
 - [Expand workflow diagrams by call site](tasks/done/call-site-expanded-workflow-diagrams.md)
 - [Classify standalone project workflow YAML](tasks/done/standalone-workflow-classification.md)
