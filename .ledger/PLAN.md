@@ -33,6 +33,7 @@ None.
 
 ## Done Tasks
 
+- [Use available width on large displays](tasks/done/wide-screen-layout.md)
 - [Persistent run scheduling](tasks/done/run-scheduling.md), [plan](plans/006-run-scheduling.md)
 - [Cancelling a run stops the Jobs its steps are attached to](tasks/done/cancel-stops-step-jobs.md)
 - [Definition graph layout: adjacent returns, edge lanes, alignment, spacing](tasks/done/definition-graph-layout-lanes.md)

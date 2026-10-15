@@ -576,3 +576,12 @@ types and dispatched each once without model calls. Browser CRUD/pause/resume an
 blocked-response loading test pass. Details and image ID in the
 [completed task](../tasks/done/run-scheduling.md). Source is on feature branch
 `feat/run-scheduling`; no unrelated component changes were present initially.
+
+## 2026-10-15: wide screen layout
+
+Worked directly on `main`: replaced the shared 1,240px navigation/page cap with
+Breadboard's 90% width, with full-width containers at tablet sizes. Frontend
+build passed. Browser measurements across seven pages and desktop sizes confirm
+aligned containers and 3,408px of usable table width at 4K. Rebuilt and deployed
+to `markovd.local`, then confirmed the deployed CSS in an isolated browser
+context with mocked API responses. See the [completed task](../tasks/done/wide-screen-layout.md).
