@@ -25,6 +25,8 @@ type SecretMount struct {
 }
 
 type RunRequest struct {
+	// RunID is allocated durably by the scheduler before launching. Empty generates one.
+	RunID              string
 	WorkflowYAML       string
 	Workflow           models.WorkflowDefinition
 	WorkflowEntrypoint string

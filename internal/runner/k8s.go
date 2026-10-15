@@ -81,7 +81,10 @@ func (r *KubernetesRunner) runDataDir(runID string) string {
 }
 
 func (r *KubernetesRunner) Start(ctx context.Context, req RunRequest) (string, error) {
-	runID := generateRunID()
+	runID := req.RunID
+	if runID == "" {
+		runID = generateRunID()
+	}
 	def, err := workflowdef.RuntimeCompatibleDefinition(req.WorkflowDefinition())
 	if err != nil {
 		return "", fmt.Errorf("invalid workflow definition: %w", err)

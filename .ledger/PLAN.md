@@ -17,6 +17,7 @@ bugs, decisions, and operational notes live under `docs/`.
 - [Standalone Markov workflow classification decision](decisions/ADR-0004-classify-standalone-markov-workflows.md)
 - [Call-site-expanded workflow diagram decision](decisions/ADR-0005-expand-definition-diagrams-by-call-site.md)
 - [Adjacent-column returns and edge lanes decision](decisions/ADR-0006-adjacent-column-returns-and-edge-lanes.md)
+- [Persistent scheduling decision](decisions/ADR-0007-persistent-scheduling.md)
 
 ## Milestones
 
@@ -32,6 +33,7 @@ None.
 
 ## Done Tasks
 
+- [Persistent run scheduling](tasks/done/run-scheduling.md), [plan](plans/006-run-scheduling.md)
 - [Cancelling a run stops the Jobs its steps are attached to](tasks/done/cancel-stops-step-jobs.md)
 - [Definition graph layout: adjacent returns, edge lanes, alignment, spacing](tasks/done/definition-graph-layout-lanes.md)
 - [Show workflow and step descriptions in the definition graph](tasks/done/definition-graph-details-panel.md)
@@ -66,6 +68,7 @@ None.
 
 ## Fixed Bugs
 
+- [Schedule editor loading race](bugs/fixed/schedule-edit-form-loading-race.md)
 - [Run graph flattens nested workflow calls](bugs/fixed/run-graph-flattens-nested-workflows.md)
 - [Run graph workflow boundary labels overlap fan-out branches](bugs/fixed/run-graph-workflow-boundary-labels-overlap.md)
 - [Project import rejects directory workflows with `step_types/`](bugs/fixed/project-import-rejects-step-types-directory.md)

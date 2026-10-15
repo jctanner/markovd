@@ -90,6 +90,42 @@ export interface Run {
   created_at: string;
 }
 
+export interface ScheduledRunRequest {
+  workflow_name: string;
+  workflow_entrypoint?: string;
+  vars: Record<string, string>;
+  debug?: boolean;
+  volumes?: { name: string; pvc: string; mount_path: string; read_only?: boolean }[];
+  secret_volumes?: { name: string; secret: string; mount_path: string; read_only?: boolean }[];
+}
+
+export interface ScheduleInput {
+  name: string;
+  kind: 'once' | 'cron';
+  cron: string;
+  timezone: string;
+  run_at: string | null;
+  request: ScheduledRunRequest;
+}
+
+export interface Schedule extends ScheduleInput {
+  id: number;
+  next_run_at: string | null;
+  state: 'active' | 'paused' | 'dispatching' | 'completed' | 'failed';
+  source_commit: string;
+  last_run_id: string;
+  last_error: string;
+  created_at: string;
+}
+
+export interface ScheduleOccurrence {
+  id: number;
+  scheduled_for: string;
+  run_id: string;
+  state: string;
+  error: string;
+}
+
 export interface Step {
   id: number;
   run_id: string;
@@ -216,6 +252,17 @@ export interface DiagramResponse {
 }
 
 export const api = {
+  listSchedules() { return request<Schedule[]>('/schedules'); },
+  getSchedule(id: number) { return request<Schedule>(`/schedules/${id}`); },
+  saveSchedule(input: ScheduleInput, id?: number) {
+    return request<Schedule>(id ? `/schedules/${id}` : '/schedules', {
+      method: id ? 'PUT' : 'POST', body: JSON.stringify(input),
+    });
+  },
+  pauseSchedule(id: number) { return request<Schedule>(`/schedules/${id}/pause`, { method: 'POST' }); },
+  resumeSchedule(id: number) { return request<Schedule>(`/schedules/${id}/resume`, { method: 'POST' }); },
+  deleteSchedule(id: number) { return request<{ deleted: boolean }>(`/schedules/${id}`, { method: 'DELETE' }); },
+  scheduleOccurrences(id: number) { return request<ScheduleOccurrence[]>(`/schedules/${id}/occurrences`); },
   login(username: string, password: string) {
     return request<{ token: string }>('/auth/login', {
       method: 'POST',

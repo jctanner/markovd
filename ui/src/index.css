@@ -783,6 +783,19 @@ td.cell-link a:hover {
   max-width: 540px;
 }
 
+.trigger-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+.schedule-help {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 16px;
+}
+
+.schedule-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.schedule-details { margin-top: 24px; }
+.schedule-details pre { overflow: auto; max-height: 400px; }
+
 .var-row {
   display: flex;
   gap: 8px;

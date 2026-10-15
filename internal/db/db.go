@@ -159,6 +159,25 @@ func (d *DB) migrate() error {
 			END IF;
 		END $$`,
 	}
+	migrations = append(migrations,
+		`CREATE TABLE IF NOT EXISTS schedules (
+ id SERIAL PRIMARY KEY, name TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK (kind IN ('once','cron')),
+ cron TEXT NOT NULL DEFAULT '', timezone TEXT NOT NULL DEFAULT 'UTC',
+ run_at TIMESTAMPTZ, next_run_at TIMESTAMPTZ,
+ state TEXT NOT NULL CHECK (state IN ('active','paused','dispatching','completed','failed')),
+ request_json JSONB NOT NULL, workflow_json JSONB NOT NULL,
+ source_commit TEXT NOT NULL DEFAULT '', created_by INTEGER NOT NULL REFERENCES users(id),
+ last_run_id TEXT NOT NULL DEFAULT '', last_error TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+ )`,
+		`CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(next_run_at) WHERE state = 'active'`,
+		`CREATE TABLE IF NOT EXISTS schedule_occurrences (
+ id SERIAL PRIMARY KEY, schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+ scheduled_for TIMESTAMPTZ NOT NULL, run_id TEXT NOT NULL UNIQUE,
+ state TEXT NOT NULL, error TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ UNIQUE(schedule_id, scheduled_for)
+ )`)
 	for _, m := range migrations {
 		if _, err := d.Exec(m); err != nil {
 			return fmt.Errorf("migration failed: %w\nSQL: %s", err, m)

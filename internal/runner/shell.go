@@ -32,7 +32,10 @@ func (r *ShellRunner) Start(ctx context.Context, req RunRequest) (string, error)
 		return "", fmt.Errorf("materializing workflow: %w", err)
 	}
 
-	runID := generateRunID()
+	runID := req.RunID
+	if runID == "" {
+		runID = generateRunID()
+	}
 	args := []string{"run", m.Path, "--verbose", "--run-id", runID}
 	if req.WorkflowEntrypoint != "" {
 		args = append(args, "--workflow", req.WorkflowEntrypoint)

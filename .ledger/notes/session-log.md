@@ -565,3 +565,14 @@ Markov gained `ansible` and `ansible_playbook` primitives. markovd's backend is 
 ## 2026-10-05 — claude step_progress in markovd
 
 Added a progress endpoint, a Transcript section in the step modal, a `claude` graph icon, and fork-event cleanup on run delete. Verified end to end with real markov and `claude`. Recorded a pre-existing bug: a run stays `running` if markov exits before sending events. See [task](../tasks/done/claude-step-progress-ui.md) and [bug](../bugs/open/shell-runner-failure-leaves-run-running.md).
+
+## 2026-10-15: persistent schedules
+
+Implemented and deployed one-time/cron scheduling with frozen definitions and
+complete launch inputs, time zones, durable occurrence claims, conservative
+recovery, non-overlap and UI management. Full Go race suite passed with isolated
+PostgreSQL, frontend build and five test files pass. Live restart preserved both
+types and dispatched each once without model calls. Browser CRUD/pause/resume and
+blocked-response loading test pass. Details and image ID in the
+[completed task](../tasks/done/run-scheduling.md). Source is on feature branch
+`feat/run-scheduling`; no unrelated component changes were present initially.

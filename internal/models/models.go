@@ -1,6 +1,38 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+type Schedule struct {
+	ID           int             `json:"id"`
+	Name         string          `json:"name"`
+	Kind         string          `json:"kind"`
+	Cron         string          `json:"cron"`
+	Timezone     string          `json:"timezone"`
+	RunAt        *time.Time      `json:"run_at"`
+	NextRunAt    *time.Time      `json:"next_run_at"`
+	State        string          `json:"state"`
+	Request      json.RawMessage `json:"request"`
+	Workflow     Workflow        `json:"-"`
+	SourceCommit string          `json:"source_commit"`
+	CreatedBy    int             `json:"created_by"`
+	LastRunID    string          `json:"last_run_id"`
+	LastError    string          `json:"last_error"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+type ScheduleOccurrence struct {
+	ID           int       `json:"id"`
+	ScheduleID   int       `json:"schedule_id"`
+	ScheduledFor time.Time `json:"scheduled_for"`
+	RunID        string    `json:"run_id"`
+	State        string    `json:"state"`
+	Error        string    `json:"error"`
+	CreatedAt    time.Time `json:"created_at"`
+}
 
 type User struct {
 	ID        int       `json:"id"`

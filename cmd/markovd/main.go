@@ -96,6 +96,9 @@ func main() {
 	}
 
 	srv := api.NewServer(database, authProvider, jwtMgr, r, markovBin, callbackToken, callbackURL, projectsDir)
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	defer stopScheduler()
+	go srv.RunScheduler(schedulerCtx)
 
 	log.Printf("Starting markovd on :%s", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), srv.Router()); err != nil {

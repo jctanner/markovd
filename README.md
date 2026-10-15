@@ -21,6 +21,8 @@ markovd provides an HTTP API and React UI on top of markov, letting users trigge
 ## Features
 
 - **Run management** — trigger, list, inspect, cancel and delete workflow runs
+- **Scheduling** — one-time and recurring cron launches with saved inputs, time zones,
+  pause/resume, dispatch history and restart recovery; see [scheduling](docs/reference/scheduling.md)
 - **Resume** — resume a paused or failed run from its saved state, with var
   overrides (a gate is evaluated again with them)
 - **Run data volume** — each run's workflow files and Markov state live on a
@@ -102,6 +104,11 @@ All under `/api/v1/`, JWT-protected except login/register and the event receiver
 | GET    | `/runs`                | List runs                      |
 | GET    | `/runs/:id`            | Run detail with all steps      |
 | POST   | `/runs`                | Trigger a new run (git-imported workflows get the `workflow_source_commit` var) |
+| GET / POST | `/schedules` | List / create one-time or cron schedules |
+| GET / PUT / DELETE | `/schedules/:id` | Inspect / edit / delete a schedule |
+| POST | `/schedules/:id/pause` | Pause future launches |
+| POST | `/schedules/:id/resume` | Resume future launches |
+| GET | `/schedules/:id/occurrences` | Recent dispatch history |
 | POST   | `/runs/:id/cancel`     | Cancel a running run           |
 | POST   | `/runs/:id/resume`     | Resume a paused or failed run: `{"vars": {...}}`; a paused run needs at least one var |
 | DELETE | `/runs/:id`            | Delete a run, its Jobs and its data |

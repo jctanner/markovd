@@ -135,6 +135,18 @@ func TestStartCreatesConfigMapAndJob(t *testing.T) {
 	}
 }
 
+func TestKubernetesRunnerUsesScheduledRunID(t *testing.T) {
+	r := newTestRunner(nil)
+	id, err := r.Start(context.Background(), RunRequest{RunID: "markov-run-scheduled", WorkflowYAML: "entrypoint: main\n"})
+	if err != nil || id != "markov-run-scheduled" {
+		t.Fatalf("id=%q error=%v", id, err)
+	}
+	job, err := r.client.BatchV1().Jobs(r.namespace).Get(context.Background(), id, metav1.GetOptions{})
+	if err != nil || !containsArgPair(job.Spec.Template.Spec.Containers[0].Args, "--run-id", id) {
+		t.Fatalf("job=%v error=%v", job, err)
+	}
+}
+
 func TestStartPassesWorkflowEntrypoint(t *testing.T) {
 	r := newTestRunner(nil)
 	ctx := context.Background()

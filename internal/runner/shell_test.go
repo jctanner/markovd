@@ -63,6 +63,13 @@ func TestShellRunnerPassesWorkflowEntrypoint(t *testing.T) {
 	}
 }
 
+func TestShellRunnerUsesScheduledRunID(t *testing.T) {
+	record := runShellRunnerWithRequest(t, RunRequest{RunID: "markov-run-scheduled", WorkflowYAML: "entrypoint: main\n"})
+	if !containsArgPair(strings.Fields(record.args), "--run-id", "markov-run-scheduled") {
+		t.Fatalf("args=%s", record.args)
+	}
+}
+
 type shellRunnerRecord struct {
 	args       string
 	kind       string

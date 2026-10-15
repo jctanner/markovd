@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import type { Workflow, PVCInfo, SecretInfo } from '../api';
+import type { Workflow, PVCInfo, SecretInfo, ScheduledRunRequest } from '../api';
+import { toLocalInput, toScheduledInstant } from './scheduleTime';
 
 function cleanYAMLScalar(value: string): string {
   return value.trim().replace(/^['"]|['"]$/g, '');
@@ -52,6 +53,17 @@ function workflowEntrypointSuggestions(workflow?: Workflow): string[] {
 }
 
 export default function TriggerRun() {
+  const [query] = useSearchParams();
+  const scheduleID = query.get('schedule') ? Number(query.get('schedule')) : undefined;
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [timing, setTiming] = useState(query.get('timing') === 'once' ? 'once' : 'now');
+  const [scheduleName, setScheduleName] = useState('');
+  const [runAt, setRunAt] = useState('');
+  const [cron, setCron] = useState('0 */6 * * *');
+  const [timezone, setTimezone] = useState(browserZone);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(!scheduleID);
+  const [savedMounts, setSavedMounts] = useState<Pick<ScheduledRunRequest, 'volumes' | 'secret_volumes'>>({});
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [pvcs, setPvcs] = useState<PVCInfo[]>([]);
   const [secrets, setSecrets] = useState<SecretInfo[]>([]);
@@ -77,10 +89,11 @@ export default function TriggerRun() {
   ].filter(Boolean).join(' / ');
 
   useEffect(() => {
+    setLoaded(!scheduleID);
     api.listWorkflows().then(setWorkflows).catch(() => {});
     api.listPVCs().then(setPvcs).catch(() => {});
     api.listSecrets().then(setSecrets).catch(() => {});
-    api.getPreferences().then((prefs) => {
+    if (!scheduleID) api.getPreferences().then((prefs) => {
       const pvcDefaults: Record<string, string> = {};
       for (const v of prefs.default_volumes) {
         if (v.name && v.mount_path) pvcDefaults[v.name] = v.mount_path;
@@ -92,7 +105,18 @@ export default function TriggerRun() {
       }
       if (Object.keys(secretDefaults).length > 0) setSelectedSecrets(secretDefaults);
     }).catch(() => {});
-  }, []);
+    if (scheduleID) api.getSchedule(scheduleID).then(item => {
+      if (!['active', 'paused'].includes(item.state)) throw new Error('This schedule can no longer be edited.');
+      setTiming(item.kind); setScheduleName(item.name); setCron(item.cron);
+      setTimezone(item.timezone); setRunAt(item.run_at ? toLocalInput(item.run_at) : '');
+      setSelectedWorkflow(item.request.workflow_name); setWorkflowEntrypoint(item.request.workflow_entrypoint || '');
+      setVars(Object.entries(item.request.vars || {}).map(([key, value]) => ({ key, value })));
+      setDebug(!!item.request.debug); setSavedMounts(item.request);
+      setSelectedPVCs(Object.fromEntries((item.request.volumes || []).map(v => [v.pvc, v.mount_path])));
+      setSelectedSecrets(Object.fromEntries((item.request.secret_volumes || []).map(v => [v.secret, v.mount_path])));
+      setLoaded(true);
+    }).catch(err => setError(err instanceof Error ? err.message : 'Could not load schedule'));
+  }, [scheduleID]);
 
   const addVar = () => setVars([...vars, { key: '', value: '' }]);
   const removeVar = (i: number) => setVars(vars.filter((_, idx) => idx !== i));
@@ -147,28 +171,59 @@ export default function TriggerRun() {
     }
     const volsList = Object.entries(selectedPVCs)
       .filter(([, path]) => path)
-      .map(([name, path]) => ({ name, pvc: name, mount_path: path }));
+      .map(([name, path]) => ({ ...savedMounts.volumes?.find(v => v.pvc === name), name: savedMounts.volumes?.find(v => v.pvc === name)?.name || name, pvc: name, mount_path: path }));
     const secretsList = Object.entries(selectedSecrets)
       .filter(([, path]) => path)
-      .map(([name, path]) => ({ name, secret: name, mount_path: path }));
+      .map(([name, path]) => ({ ...savedMounts.secret_volumes?.find(v => v.secret === name), name: savedMounts.secret_volumes?.find(v => v.secret === name)?.name || name, secret: name, mount_path: path }));
+    setSaving(true);
     try {
-      const run = await api.createRun(selectedWorkflow, varsMap, debug, volsList, secretsList, workflowEntrypoint);
-      navigate(`/runs/${run.run_id}`);
+      if (timing === 'now') {
+        const run = await api.createRun(selectedWorkflow, varsMap, debug, volsList, secretsList, workflowEntrypoint);
+        navigate(`/runs/${run.run_id}`);
+      } else {
+        await api.saveSchedule({ name: scheduleName, kind: timing as 'once' | 'cron',
+          cron: timing === 'cron' ? cron : '', timezone: timing === 'cron' ? timezone : browserZone,
+          run_at: timing === 'once' ? toScheduledInstant(runAt) : null,
+          request: { workflow_name: selectedWorkflow, workflow_entrypoint: workflowEntrypoint,
+            vars: varsMap, debug, volumes: volsList, secret_volumes: secretsList } }, scheduleID);
+        navigate('/schedules');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger run');
-    }
+    } finally { setSaving(false); }
   };
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Trigger Run</h1>
+        <h1 className="page-title">{scheduleID ? 'Edit Schedule' : 'Trigger Run'}</h1>
       </div>
 
       <div className="trigger-form">
         {error && <div className="msg-error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
+          <fieldset className="trigger-fields" disabled={saving || !loaded}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="launch-timing">Launch</label>
+            <select id="launch-timing" className="form-select" value={timing} onChange={e => setTiming(e.target.value)}>
+              {!scheduleID && <option value="now">Run now</option>}
+              <option value="once">Once at a specific time</option>
+              <option value="cron">Recurring cron schedule</option>
+            </select>
+          </div>
+          {timing !== 'now' && <>
+            <div className="form-group"><label className="form-label" htmlFor="schedule-name">Schedule Name</label><input id="schedule-name" className="form-input" value={scheduleName} onChange={e => setScheduleName(e.target.value)} required maxLength={200} /></div>
+            {timing === 'once' ? <div className="form-group">
+              <label className="form-label" htmlFor="schedule-at">Date and Time ({browserZone})</label>
+              <input id="schedule-at" type="datetime-local" className="form-input" value={runAt} onChange={e => setRunAt(e.target.value)} required />
+              {runAt && Number.isFinite(new Date(runAt).getTime()) && <p className="schedule-help">{new Date(runAt).toLocaleString(undefined, { timeZoneName: 'long' })} · {new Date(runAt).toISOString()}</p>}
+            </div> : <>
+              <div className="form-group"><label className="form-label" htmlFor="schedule-cron">Cron Expression</label><input id="schedule-cron" className="form-input" value={cron} onChange={e => setCron(e.target.value)} required /><p className="schedule-help">Five fields: minute hour day month weekday. Example: 0 */6 * * * runs every six hours.</p></div>
+              <div className="form-group"><label className="form-label" htmlFor="schedule-zone">Time Zone</label><input id="schedule-zone" className="form-input" value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="America/New_York" required /><p className="schedule-help">IANA time zone. The schedule follows daylight saving time. Previous active runs block the next launch.</p></div>
+            </>}
+            <p className="schedule-help">The workflow definition and inputs are saved with the schedule. Missed cron times coalesce into one launch after downtime. An uncertain launch stops scheduling for inspection.</p>
+          </>}
           <div className="form-group">
             <label className="form-label">Workflow</label>
             <select
@@ -357,9 +412,10 @@ export default function TriggerRun() {
             </label>
           </div>
 
-          <button type="submit" className="btn btn-primary">
-            Trigger Run
+          <button type="submit" className="btn btn-primary" disabled={saving || !loaded}>
+            {saving ? 'Saving...' : scheduleID ? 'Save Schedule' : timing === 'now' ? 'Trigger Run' : 'Create Schedule'}
           </button>
+          </fieldset>
         </form>
       </div>
     </div>
